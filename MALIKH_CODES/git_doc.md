@@ -504,3 +504,31 @@ git switch -                    # back to previous branch
 very hard to lose. Git keeps a reflog even for commits I deleted. It is the
 uncommitted work that is fragile, so commit early and often. History can be
 tidied later.
+
+
+--
+after git push -u origin main
+
+UI authentication link copy
+
+https://github.com/login/device
+
+git log --oneline     # should list your commit
+git status            # should say "up to date with 'origin/main'"
+
+
+Commits don't have names — pointers do
+A commit is just a snapshot with a hash (e50f33e). It never moves and never changes. What moves are the labels pointing at it.
+
+        e50f33e
+           ▲
+           │
+    ┌──────┼──────┐
+   main         origin/main
+    ▲
+    │
+   HEAD
+
+git log --oneline --all --graph    # every branch, drawn as a graph
+git branch -a                      # local and remote branches
+cat .git/HEAD                      # literally: ref: refs/heads/main

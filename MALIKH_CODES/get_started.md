@@ -15,6 +15,8 @@ Remote      github.com/Abdulmalikhtk/code-lab
 2. [Letting Others Use the Repo](#2-letting-others-use-the-repo)
 3. [Pull Requests](#3-pull-requests)
 4. [Seeing the Folder Structure](#4-seeing-the-folder-structure)
+5. [Adding a New Folder](#5-adding-a-new-folder)
+6. [When Push Is Rejected](#6-when-push-is-rejected)
 
 ---
 
@@ -204,3 +206,135 @@ find . -not -path "./.git/*" -not -name ".git"
 **Note.** Only `git_doc.md` has been committed and pushed so far. `git_branch.md`
 and `get_started.md` exist on disk but will not appear on GitHub until they are
 committed. `git status` confirms which is which.
+
+---
+
+## 5. Adding a New Folder
+
+```bash
+cd ~/coding_practise/CODE_PRACTICE
+mkdir aafren_codes
+```
+
+Or in VS Code: right-click empty space in the Explorer sidebar -> New Folder.
+
+### Git ignores empty folders
+
+**Git tracks files, not directories.** An empty folder is invisible to git:
+`git status` will not mention it, `git add .` will not stage it, and it will never
+appear on GitHub.
+
+So put something in it:
+
+```bash
+touch aafren_codes/README.md      # a real file
+touch aafren_codes/.gitkeep       # or a placeholder
+```
+
+`.gitkeep` is not a git feature. It is an agreed-on empty placeholder file. The
+folder exists on GitHub because the file inside it does.
+
+Then commit as usual:
+
+```bash
+git status                        # should now show ?? aafren_codes/
+git add .
+git commit -m "Add aafren_codes folder"
+git push
+```
+
+### Naming consistency
+
+`MALIKH_CODES` is uppercase and `aafren_codes` is lowercase. Git on macOS is
+case-insensitive but case-preserving, while GitHub is case-sensitive. Mismatched
+conventions cause real confusion later. Pick one style and keep it.
+
+A case-only rename needs two steps, because a direct one is silently ignored:
+
+```bash
+git mv MALIKH_CODES malikh_codes_tmp
+git mv malikh_codes_tmp malikh_codes
+```
+
+---
+
+## 6. When Push Is Rejected
+
+```
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally.
+```
+
+This means GitHub has a commit the laptop does not — usually from editing a file or
+adding a README through the web interface.
+
+```
+  laptop:   A --- B --- C          my commits
+              \
+  GitHub:      A --- B --- W       W = the web commit I do not have
+```
+
+The histories diverged. Nothing is broken and nothing is lost.
+
+### The fix
+
+```bash
+git pull --rebase
+git push
+```
+
+### Why plain git pull is not enough
+
+A bare `git pull` on divergent branches now stops with:
+
+```
+fatal: Need to specify how to reconcile divergent branches.
+```
+
+Git fetched the commit but will not guess how to combine it. The three options:
+
+| Command                 | Result                                    |
+| ----------------------- | ----------------------------------------- |
+| `git pull --rebase`     | Replay my commits on top. Linear history. |
+| `git pull --no-rebase`  | Create a merge commit. The old default.   |
+| `git pull --ff-only`    | Only if I have no local commits. Refuses otherwise. |
+
+`--rebase` is right here. Unpushed commits are safe to rebase — this is exactly the
+case the golden rule permits.
+
+```
+  before:   e50f33e --- (my commit)             local main
+                \
+                 ------ b9c6d6d                 origin/main
+
+  after:    e50f33e --- b9c6d6d --- (my commit) both
+```
+
+### Stop being asked every time
+
+```bash
+git config --global pull.rebase true
+```
+
+### If the rebase hits a conflict
+
+Only happens when both sides touched the same lines.
+
+```bash
+# open the file, remove the <<<<<<< markers, keep what I want
+git add <file>
+git rebase --continue
+```
+
+Back out entirely with `git rebase --abort`. Nothing is lost.
+
+### Confirm
+
+```bash
+git log --oneline --graph
+```
+
+The web commit should be in history with mine on top, and `main` and `origin/main`
+back on the same commit.

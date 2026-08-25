@@ -1,0 +1,20 @@
+Linked List:  Try to complete from 1 to 6 tomorrow (Aug_26)
+1. createList (Sasken)
+2. DeleteList
+3. printList
+4. InsertionAtPosition
+5. DeletionAtPosition
+6. GetMidElement (Sasken)
+7. MakeMidAsAFirstElement
+
+
+8. ReverseList (Sasken)
+9. CheckTheListIsPalindromeOrNot
+10. FindDuplicateInList
+
+Advanced:
+11. CreateOneMoreList
+12. MergeTwoListIntoOne
+13. SortTheMergedList
+14. DetectCycleOrLoopInList
+15. RemoveCyecleInOrLoopInList

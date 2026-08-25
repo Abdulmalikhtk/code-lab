@@ -1,0 +1,20 @@
+# Build output — one line, covers every build/ folder at any depth
+build/
+
+# Safety net: binaries that escape build/ by accident
+*.o
+*.out
+*.exe
+*.app
+*.dSYM/
+a.out
+
+# Never ignore source or notes, no matter what matched above
+!*.cpp
+!*.h
+!*.hpp
+!*.md
+!*.txt
+
+# macOS clutter
+.DS_Store

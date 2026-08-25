@@ -1,0 +1,17 @@
+git clone https://github.com/Abdulmalikhtk/code-lab.git
+cd code-lab
+
+git config user.email "abdulmalikhtk@gmail.com"
+git config user.name  "Abdulmalikhtk"
+
+git config user.email        # verify it prints the gmail one
+
+git switch -c feat/whatever    # or stay on main
+# ... create files, edit ...
+git add .
+git commit -m "message"
+git push
+Keeping it current
+Since you now have two clones of the same repo, they'll drift. Before working in either one:
+
+git pull

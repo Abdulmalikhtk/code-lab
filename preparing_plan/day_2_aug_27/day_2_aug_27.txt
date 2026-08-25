@@ -1,0 +1,18 @@
+1. ReverseList (Sasken)
+2. CheckTheListIsPalindromeOrNot
+3. FindDuplicateInList
+4. RemoveDuplicateInList
+5. SearchInList
+
+OOPS:
+1. Struct
+2. Access Specifiers
+3. Class
+4. Object
+    2.a Normal Object Creation
+    2.b Pointer Object Creation
+    2.c Base Class pointer Object Creation
+    2.d Derived Class pointer Object Creation
+    2.e Base and Desrived Class pointer Object Creation
+
+5.Basic Inheritance Base Derived

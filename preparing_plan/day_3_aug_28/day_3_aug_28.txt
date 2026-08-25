@@ -1,0 +1,17 @@
+1. CreateOneMoreList
+2. MergeTwoListIntoOne
+3. SortTheMergedList
+4. DetectCycleOrLoopInList
+5. RemoveCyecleInOrLoopInList
+
+
+OOPS:
+5. Constructor
+    5.a Default Constructor
+    5.b Paramterized Constructor
+    5.c Copy Constructor
+        5.c.a Deep Copy
+        5.c.B Shallow Copy
+    5.d Move Constructor
+6. Destructor
+    6.a Virtual Destructor

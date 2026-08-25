@@ -1,0 +1,8 @@
+Linked List:
+1. createList (Sasken)
+2. DeleteList
+3. printList
+4. InsertionAtPosition
+5. DeletionAtPosition
+6. GetMidElement (Sasken)
+7. MakeMidAsAFirstElement

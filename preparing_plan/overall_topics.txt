@@ -1,0 +1,43 @@
+Linked List:  Try to complete from 1 to 6 tomorrow (Aug_26)
+1. createList (Sasken)
+2. DeleteList
+3. printList
+4. InsertionAtPosition
+5. DeletionAtPosition
+6. GetMidElement (Sasken)
+7. MakeMidAsAFirstElement
+8. ReverseList (Sasken)
+9. CheckTheListIsPalindromeOrNot
+10. FindDuplicateInList
+11. RemoveDuplicateInList
+12. SearchInList
+
+Advanced:
+13. CreateOneMoreList
+14. MergeTwoListIntoOne
+15. SortTheMergedList
+16. DetectCycleOrLoopInList
+17. RemoveCyecleInOrLoopInList
+
+
+OOPS:
+1. Struct
+2. Access Specifiers
+3. Class
+4. Object
+    4.a Normal Object Creation
+    4.b Pointer Object Creation
+    4.c Base Class pointer Object Creation
+    4.d Derived Class pointer Object Creation
+    4.e Base and Desrived Class pointer Object Creation
+
+5.Basic Inheritance Base Derived
+6. Constructor
+    6.a Default Constructor
+    6.b Paramterized Constructor
+    6.c Copy Constructor
+        6.c.a Deep Copy
+        6.c.B Shallow Copy
+    6.d Move Constructor
+7. Destructor
+    7.a Virtual Destructor

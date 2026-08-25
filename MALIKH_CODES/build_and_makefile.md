@@ -20,9 +20,13 @@ What the compiler is doing is in [cpp_compilation.md](cpp_compilation.md).
 1. [The build/ Habit](#1-the-build-habit)
 2. [Setting Up .gitignore](#2-setting-up-gitignore)
 3. [Verifying It Worked](#3-verifying-it-worked)
-4. [The Makefile](#4-the-makefile)
-5. [Common Errors](#5-common-errors)
-6. [Quick Reference](#6-quick-reference)
+4. [How make Works](#4-how-make-works)
+5. [The Makefile](#5-the-makefile)
+6. [Makefile Syntax Reference](#6-makefile-syntax-reference)
+7. [make asan](#7-make-asan)
+8. [Debugging a Makefile](#8-debugging-a-makefile)
+9. [Common Errors](#9-common-errors)
+10. [Quick Reference](#10-quick-reference)
 
 ---
 
@@ -128,16 +132,26 @@ git status
 Expected: `.cpp`, `.md`, `Makefile` and `.gitignore` listed — and **no**
 `build/`, no bare binary.
 
-If `build/` still appears, either the file is not at the repo root, or VS Code
-saved it as `gitignore` without the leading dot.
+Git collapses new folders into a single entry. To see inside:
 
-Check a single file and see which rule caught it:
+```bash
+git status --untracked-files=all
+```
+
+Check one file and see which rule caught it:
 
 ```bash
 git check-ignore -v MALIKH_CODES/Linked_List/build/linked_list
 ```
 
-Prints the `.gitignore` line responsible. Prints nothing if it is not ignored.
+Expected:
+
+```
+.gitignore:2:build/	MALIKH_CODES/Linked_List/build/linked_list
+```
+
+Prints nothing if the file is **not** ignored — usually because `.gitignore` is
+not at the repo root, or was saved as `gitignore` without the leading dot.
 
 Then commit:
 
@@ -150,14 +164,85 @@ git push
 
 ---
 
-## 4. The Makefile
+## 4. How make Works
+
+`make` is not a script runner. It is a **dependency resolver**.
+
+You do not tell it what steps to run. You tell it **what depends on what**, and
+how to produce each thing. Make works out the order and skips anything already
+up to date.
+
+### Anatomy of a rule
+
+```
+target            prerequisites
+   |                    |
+   v                    v
+build/linked_list: linked_list.cpp
+        g++ -std=c++17 linked_list.cpp -o build/linked_list
+^
+TAB (mandatory)         ^-- recipe
+```
+
+| Part | Meaning |
+| ---- | ------- |
+| Target | The file this rule produces |
+| Prerequisites | The files the target is built *from* |
+| Recipe | Shell commands that do it. Each line starts with a **TAB** |
+
+Read it as a sentence: *"`build/linked_list` is made from `linked_list.cpp`, by
+running this command."*
+
+### The algorithm
+
+For each target, make asks two questions:
+
+1. **Does the target file exist?** If no, run the recipe.
+2. **Is any prerequisite newer than the target?** If yes, run the recipe.
+
+Otherwise, do nothing.
+
+That is the whole thing — a timestamp comparison.
+
+```bash
+$ make
+g++ -std=c++17 -Wall -Wextra -g linked_list.cpp -o build/linked_list
+
+$ make
+make: Nothing to be done for 'all'.
+```
+
+The second run skipped because the source is older than the binary.
+`Nothing to be done` is **not an error**.
+
+> **The consequence.** Make trusts timestamps completely and never looks inside
+> a file. This is why editing a header does not trigger a rebuild unless the
+> header is listed as a prerequisite — you get a stale binary with no warning.
+
+### The dependency graph
+
+Rules chain. A target in one rule can be a prerequisite in another:
+
+```
+        program
+         /    \
+    main.o    list.o
+      |         |
+  main.cpp   list.cpp
+```
+
+Make walks this bottom-up. Edit only `list.cpp` and it recompiles `list.o`,
+relinks `program`, and leaves `main.o` alone. Nobody wrote that logic — only
+the edges were declared.
+
+---
+
+## 5. The Makefile
 
 `make` ships with the Command Line Tools, so it is already installed.
 
 A `Makefile` records the build recipe once, so `-std=c++17` can never be
-forgotten and a collaborator can build without asking which flags to use. It
-also skips work that is not needed — make compares timestamps and will not
-recompile a `.cpp` that has not changed.
+forgotten and a collaborator can build without asking which flags to use.
 
 The `Makefile` **is source code**. Commit it.
 
@@ -171,16 +256,49 @@ Spaces produce an error that explains nothing:
 Makefile:8: *** missing separator.  Stop.
 ```
 
-VS Code converts tabs to spaces by default. Fix before saving:
-
-- Status bar, bottom right → click **"Spaces: 4"** → **Indent Using Tabs**
-- Or in `settings.json`:
+VS Code **already handles this**. The bundled `make` extension ships this
+default:
 
 ```json
-"[makefile]": { "editor.insertSpaces": false }
+"configurationDefaults": { "[makefile]": { "editor.insertSpaces": false } }
 ```
 
-This is the most common Makefile problem. Check it first, always.
+So pressing Tab in a Makefile inserts a real tab, with no configuration needed.
+Two conditions:
+
+- **The filename must be recognised.** The default applies to `Makefile`,
+  `makefile`, `GNUmakefile`, `.mak`, `.mk`. Name it `Makefile.txt` and the
+  editor treats it as plain text and uses spaces.
+- **It only affects the Tab key, not pasted text.** Copying the file out of a
+  rendered markdown preview or a browser can bring spaces with it.
+
+### Verifying the tabs
+
+```bash
+awk '/^\t/{n++} END{print n+0}' Makefile
+```
+
+Must print **4** for the Makefile below.
+
+> Do **not** use `grep -P '^\t'`. `-P` is a GNU grep feature and macOS ships BSD
+> grep, which rejects it with `grep: invalid option -- P`.
+
+Or look at it directly — `cat -t` renders tabs as `^I`:
+
+```bash
+cat -t Makefile
+```
+
+```
+$(BUILD)/%: %.cpp | $(BUILD)
+^I$(CXX) $(CXXFLAGS) $< -o $@
+```
+
+If the recipe lines show spaces instead of `^I`, convert them:
+
+```bash
+sed -i '' 's/^    /\t/' Makefile
+```
 
 ### The file
 
@@ -217,78 +335,316 @@ clean:
 
 The same file works unchanged in every project folder. Copy it as-is.
 
-### Reading it
+### Line by line
 
-| Piece | Means |
-| ----- | ----- |
-| `CXX := g++` | A variable. Used later as `$(CXX)` |
-| `all: $(BINS)` | The **first** target is the default, so bare `make` runs this |
-| indented line | The recipe — the shell command. Starts with a **TAB** |
-| `$(wildcard *.cpp)` | Every `.cpp` in the folder |
-| `$(patsubst %.cpp,$(BUILD)/%,...)` | Turns `linked_list.cpp` into `build/linked_list` |
-| `$(BUILD)/%: %.cpp` | A **pattern rule** — one recipe covering all files |
-| `$<` | The first prerequisite (the `.cpp`) |
-| `$@` | The target (the binary) |
-| `\| $(BUILD)` | Order-only prerequisite. Create the folder first, but do not rebuild just because its timestamp changed |
-| `asan: CXXFLAGS += ...` | Target-specific variable — extra flags for this target only |
-| `.PHONY` | These are command names, not files. Without it, if a file named `clean` ever exists, `make clean` silently does nothing |
+| Line | Does |
+| ---- | ---- |
+| `CXX := g++` | Variable. Change the compiler in one place |
+| `SRCS := $(wildcard *.cpp)` | Every `.cpp` in the folder → `linked_list.cpp` |
+| `BINS := $(patsubst ...)` | Turns that into `build/linked_list` |
+| `all: $(BINS)` | The **default goal** — the first target is what bare `make` builds. No recipe; it just depends on every binary |
+| `$(BUILD)/%: %.cpp` | The engine. A **pattern rule** covering every program in the folder |
+| `$(BUILD):` | A rule whose target is a **directory**. Runs once |
+| `run: $(BUILD)/$(F)` | `F` comes from the command line. Depends on the binary, so it builds first |
+| `asan: CXXFLAGS += ...` | Appends flags **only** when the goal is `asan` |
+| `asan: clean all` | Two rules, one target. Forces a clean rebuild |
+| `clean:` | `rm -rf build` |
+| `.PHONY:` | Marks command-targets so make does not treat them as filenames |
 
 ### Usage
 
 ```bash
 make                       # build every .cpp in the folder
 make run F=linked_list     # build and run one program
-make asan                  # rebuild everything with the memory checker
+make asan                  # rebuild with the sanitizers
 make clean                 # delete build/
 ```
 
-**`make asan` is the important one for linked list work.** Linked lists are all
-raw `new`/`delete`, and AddressSanitizer reports leaked nodes and use-after-free
-with exact line numbers — instead of a silent wrong answer or a bare
-`Segmentation fault`.
-
-Running `make` twice in a row prints `Nothing to be done for 'all'`. That is not
-an error, it means nothing changed. Force a full rebuild with
-`make clean && make`.
+Force a full rebuild: `make clean && make`, or `make -B`.
 
 ---
 
-## 5. Common Errors
+## 6. Makefile Syntax Reference
+
+### Variables
+
+Use with `$(NAME)`. Parentheses are required for names longer than one
+character.
+
+| Form | Called | Behaviour |
+| ---- | ------ | --------- |
+| `:=` | Simple | Evaluated **once**, immediately. **Use this** |
+| `=` | Recursive | Re-evaluated on every use. Can self-reference and hang |
+| `?=` | Conditional | Assign only if not already set |
+| `+=` | Append | Add to the existing value |
+
+Command-line assignment beats what is in the file:
+
+```bash
+make CXXFLAGS="-std=c++20 -O2"
+```
+
+`CXX`, `CXXFLAGS`, `CC`, `CFLAGS`, `LDFLAGS` are conventional names that make's
+built-in rules already use. Follow the convention.
+
+### Automatic variables
+
+Set by make per rule, so recipes never repeat filenames.
+
+| Variable | Is |
+| -------- | -- |
+| `$@` | The **target** |
+| `$<` | The **first** prerequisite |
+| `$^` | **All** prerequisites, space-separated, deduplicated |
+| `$*` | The **stem** — whatever `%` matched |
+
+In the pattern rule, building `build/linked_list` from `linked_list.cpp`:
+
+```make
+$(CXX) $(CXXFLAGS) $< -o $@
+#                  |     +-- build/linked_list
+#                  +-------- linked_list.cpp
+```
+
+`$<` versus `$^` matters: compiling takes one source, linking takes all objects.
+
+### Pattern rules
+
+```make
+$(BUILD)/%: %.cpp
+```
+
+`%` matches a **stem** and carries it across. `build/%` against
+`build/linked_list` gives stem `linked_list`, so the prerequisite becomes
+`linked_list.cpp`. One rule, unlimited files.
+
+### `.PHONY`
+
+Make assumes every target is a filename. `clean` is not — it is a command.
+
+Without `.PHONY`, if a file named `clean` ever appeared in the folder, make
+would see it, find it has no prerequisites, decide it is up to date, and print
+`make: 'clean' is up to date.` — refusing to delete anything, for no visible
+reason.
+
+**Any target that is not a real file belongs in `.PHONY`.**
+
+### Order-only prerequisites
+
+```make
+$(BUILD)/%: %.cpp | $(BUILD)
+#                   ^ everything after | is order-only
+```
+
+Normal prerequisites trigger a rebuild when newer. Order-only ones only
+guarantee ordering.
+
+This is required for directories. A directory's timestamp updates every time a
+file is written into it, so `build/` would always look newer than the binaries
+inside it and make would rebuild everything on every run, forever. The `|` says
+*"ensure this exists first, but ignore its timestamp."*
+
+### Functions
+
+| Function | Does |
+| -------- | ---- |
+| `$(wildcard pattern)` | Expand a glob against the filesystem |
+| `$(patsubst from,to,text)` | Pattern substitution across a list |
+| `$(shell cmd)` | Run a shell command, capture the output |
+| `$(notdir path)` | Strip the directory part |
+| `$(basename f)` | Strip the extension |
+
+`wildcard` + `patsubst` is the standard idiom for "build everything here".
+
+### Recipe gotchas
+
+**Each recipe line runs in a separate shell.** State does not carry:
+
+```make
+bad:
+	cd build          # this shell exits
+	ls                # runs in the ORIGINAL directory
+```
+
+Chain with `&&` instead:
+
+```make
+good:
+	cd build && ls
+```
+
+**`$` means make, not shell.** Double it to pass one through:
+
+```make
+	echo $$HOME       # shell variable
+	echo $(HOME)      # make variable
+```
+
+**Line prefixes:**
+
+| Prefix | Effect |
+| ------ | ------ |
+| `@` | Do not echo the command before running it |
+| `-` | Ignore a non-zero exit code and keep going |
+
+By default make stops immediately when a command fails.
+
+---
+
+## 7. make asan
+
+```make
+asan: CXXFLAGS += -fsanitize=address -fsanitize=undefined
+asan: clean all
+```
+
+Two rules for one target:
+
+- The first appends the sanitizer flags, **only** when the goal is `asan`. A
+  plain `make` never sees them.
+- The second forces `clean` before `all`. Without it, make would see an
+  up-to-date binary, skip the compile, and leave the **un-instrumented** build
+  running while you believed it was checked.
+
+### What the flags do
+
+The compiler rewrites the program, inserting a check before every memory access
+and every operation that could be undefined. It also replaces `new`/`delete`
+with versions that pad allocations with poisoned redzones and quarantine freed
+memory instead of reusing it.
+
+The program then **crashes loudly at the exact moment of the bug**, instead of
+corrupting memory silently and misbehaving somewhere unrelated later.
+
+### What it catches on this Mac
+
+| Bug | Caught | Line numbers |
+| --- | ------ | ------------ |
+| Use after free | Yes | No — see below |
+| Double free | Yes | No |
+| Heap buffer overflow | Yes | No |
+| Stack buffer overflow | Yes | No |
+| Undefined behaviour (UBSan) | Yes | **Yes** |
+| **Memory leaks** | **No** | — |
+
+### Memory leaks are NOT detected here
+
+**LeakSanitizer is not supported on macOS arm64.**
+
+```
+$ ASAN_OPTIONS=detect_leaks=1 ./program
+AddressSanitizer: detect_leaks is not supported on this platform.
+```
+
+It works on Linux and on Intel Macs. On this machine, forgetting `destroy(head)`
+will not be reported. The `destroy()` calls still matter — there is just no
+automated check for them.
+
+### Why ASan output has no line numbers
+
+`llvm-symbolizer` is not installed. It ships with full Xcode, not with the
+Command Line Tools:
+
+```
+$ xcrun -f llvm-symbolizer
+xcrun: error: unable to find utility "llvm-symbolizer"
+```
+
+So ASan prints addresses and offsets rather than `file:line`. The report still
+names three useful things: where the memory was touched, where it was freed,
+and where it was allocated.
+
+**UBSan is unaffected** and prints exact source locations:
+
+```
+ub.cpp:4:15: runtime error: shift exponent 40 is too large for 32-bit type 'int'
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior ub.cpp:4:15
+```
+
+### Cost
+
+Roughly 2x slower and 3x more memory. Irrelevant for practice programs, which
+is why it is a separate target rather than always on.
+
+### When to use it
+
+Run `make asan` whenever the program does something inexplicable: a garbage
+value, an intermittent crash, output that changes between runs. Those are the
+signatures of touching freed or uninitialised memory.
+
+---
+
+## 8. Debugging a Makefile
+
+```bash
+make -n              # dry run: print the commands, execute nothing
+make -B              # force a rebuild of everything, ignore timestamps
+make --debug=b       # explain WHY each target was or was not rebuilt
+make -p              # dump every rule and variable, including built-ins
+make -j4             # run 4 recipes in parallel
+```
+
+`make -n` first, always. It shows exactly what would run with all variables
+expanded, which instantly exposes a mistyped flag or an empty variable.
+
+`make --debug=b` answers "why didn't it rebuild?"
+
+---
+
+## 9. Common Errors
 
 | Error | Cause |
 | ----- | ----- |
-| `missing separator. Stop.` | Spaces instead of a TAB on a recipe line |
+| `missing separator. Stop.` | Spaces instead of a TAB on a recipe line. Verify with `awk '/^\t/{n++} END{print n+0}' Makefile` |
+| `grep: invalid option -- P` | macOS ships BSD grep. Use the `awk` command above instead |
 | `No targets specified and no makefile found` | Wrong folder, or the file is named `makefile.txt`. Must be exactly `Makefile` or `makefile` |
 | `Nothing to be done for 'all'` | Not an error. Nothing changed since the last build |
+| Edits appear to be ignored | Ran the old binary because the build failed, or a header changed that make does not track. Confirm with `make clean && make` |
 | `build/` shows in `git status` | `.gitignore` is not at the repo root, or was saved as `gitignore` without the dot |
 | Binary still tracked after ignoring | It was already committed. Use `git rm --cached` |
-| `command not found: ./build/linked_list` | Missing `./`, or the build failed and the binary was never created |
+| `command not found: ./build/...` | Missing `./`, or the build failed and the binary was never created |
+| `cd` in a recipe has no effect | Each recipe line is a separate shell. Chain with `&&` |
 
 ---
 
-## 6. Quick Reference
+## 10. Quick Reference
 
 ```bash
 # Daily use
 make                       # build everything changed
 make run F=linked_list     # build and run one program
-make asan                  # rebuild with memory checking
+make asan                  # rebuild with the sanitizers
 make clean                 # delete build/
+
+# Debugging the build
+make -n                    # dry run
+make -B                    # force full rebuild
+make --debug=b             # why did/didn't it rebuild
 
 # Without a Makefile
 mkdir -p build && g++ -std=c++17 -Wall -Wextra -g linked_list.cpp -o build/linked_list && ./build/linked_list
 
+# Checking tabs
+awk '/^\t/{n++} END{print n+0}' Makefile     # expect 4
+cat -t Makefile                              # tabs show as ^I
+
 # Git
-git status                                          # build/ should NOT appear
-git check-ignore -v <path>                          # which rule ignored it
-git rm --cached <file>                              # untrack an already-committed binary
+git status --untracked-files=all             # see inside new folders
+git check-ignore -v <path>                   # which rule ignored it
+git rm --cached <file>                       # untrack an already-committed binary
 ```
+
+### Automatic variables
+
+| `$@` | `$<` | `$^` | `$*` |
+| ---- | ---- | ---- | ---- |
+| target | first prerequisite | all prerequisites | the `%` stem |
 
 ### New project folder
 
 1. `mkdir MALIKH_CODES/NewTopic && cd MALIKH_CODES/NewTopic`
-2. Copy the [Makefile](#the-file) into it
-3. Confirm VS Code is set to tabs for Makefiles
+2. Copy the [Makefile](#the-file) into it, unchanged
+3. Verify the tabs: `awk '/^\t/{n++} END{print n+0}' Makefile` → 4
 4. Write the `.cpp`, then `make && make run F=<name>`
 
 The root `.gitignore` already covers the new `build/` folder. Nothing to add.

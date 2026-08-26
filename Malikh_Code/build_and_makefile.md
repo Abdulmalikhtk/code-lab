@@ -25,8 +25,9 @@ What the compiler is doing is in [cpp_compilation.md](cpp_compilation.md).
 6. [Makefile Syntax Reference](#6-makefile-syntax-reference)
 7. [make asan](#7-make-asan)
 8. [Debugging a Makefile](#8-debugging-a-makefile)
-9. [Common Errors](#9-common-errors)
-10. [Quick Reference](#10-quick-reference)
+9. [The Android Build System](#9-the-android-build-system)
+10. [Common Errors](#10-common-errors)
+11. [Quick Reference](#11-quick-reference)
 
 ---
 
@@ -278,7 +279,7 @@ Two conditions:
 awk '/^\t/{n++} END{print n+0}' Makefile
 ```
 
-Must print **4** for the Makefile below.
+Must print **5** for the Makefile below — one per recipe line.
 
 > Do **not** use `grep -P '^\t'`. `-P` is a GNU grep feature and macOS ships BSD
 > grep, which rejects it with `grep: invalid option -- P`.
@@ -321,8 +322,11 @@ $(BUILD)/%: %.cpp | $(BUILD)
 $(BUILD):
 	mkdir -p $(BUILD)
 
-run: $(BUILD)/$(F)
-	./$(BUILD)/$(F)
+run-%: $(BUILD)/%
+	@./$(BUILD)/$*
+
+list:
+	@echo "Programs: $(notdir $(BINS))"
 
 asan: CXXFLAGS += -fsanitize=address -fsanitize=undefined
 asan: clean all
@@ -330,10 +334,28 @@ asan: clean all
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all run asan clean
+.PHONY: all list asan clean
 ```
 
 The same file works unchanged in every project folder. Copy it as-is.
+
+> **`run-%`, not `run F=<name>`.** An earlier version of this file used
+> `run: $(BUILD)/$(F)`. That breaks badly when `F` is omitted: `$(F)` expands to
+> nothing, the recipe becomes `./build/`, and the shell refuses to execute a
+> directory —
+>
+> ```
+> $ make run
+> make: ./build/: Permission denied
+> ```
+>
+> which says nothing about the real problem. The pattern-rule form needs no
+> variable, supports tab completion, and fails clearly on a typo:
+>
+> ```
+> $ make run-typo
+> make: *** No rule to make target `run-typo'.  Stop.
+> ```
 
 ### Line by line
 
@@ -345,22 +367,29 @@ The same file works unchanged in every project folder. Copy it as-is.
 | `all: $(BINS)` | The **default goal** — the first target is what bare `make` builds. No recipe; it just depends on every binary |
 | `$(BUILD)/%: %.cpp` | The engine. A **pattern rule** covering every program in the folder |
 | `$(BUILD):` | A rule whose target is a **directory**. Runs once |
-| `run: $(BUILD)/$(F)` | `F` comes from the command line. Depends on the binary, so it builds first |
+| `run-%: $(BUILD)/%` | Pattern rule. `make run-foo` builds `build/foo` first, then runs it. `$*` is the stem, `@` hides the echoed command |
+| `list:` | Prints the available program names |
 | `asan: CXXFLAGS += ...` | Appends flags **only** when the goal is `asan` |
 | `asan: clean all` | Two rules, one target. Forces a clean rebuild |
 | `clean:` | `rm -rf build` |
-| `.PHONY:` | Marks command-targets so make does not treat them as filenames |
+| `.PHONY:` | Marks command-targets so make does not treat them as filenames. `run-%` is a pattern rule and does **not** belong here |
 
 ### Usage
 
 ```bash
 make                       # build every .cpp in the folder
-make run F=linked_list     # build and run one program
+make list                  # show the available program names
+make run-linked_list       # build and run one program
+make run-mylinkedlist      # a folder can hold many programs
 make asan                  # rebuild with the sanitizers
 make clean                 # delete build/
 ```
 
 Force a full rebuild: `make clean && make`, or `make -B`.
+
+A folder can hold as many programs as you like — `make` builds them all, and
+each gets its own `run-` target automatically. Nothing in the Makefile needs
+editing when a new `.cpp` is added.
 
 ---
 
@@ -591,7 +620,400 @@ expanded, which instantly exposes a mistyped flag or an empty variable.
 
 ---
 
-## 9. Common Errors
+## 9. The Android Build System
+
+Android's build files use GNU Make syntax, so the fundamentals from the previous
+sections carry over directly. What changes is the **role** the file plays.
+
+### 9.1 Three different things get called "the Android build"
+
+They are routinely confused. They are not the same system.
+
+| | Who uses it | File | Built by |
+| --- | --- | --- | --- |
+| **NDK build** | App developers compiling native C/C++ into an APK | `Android.mk` + `Application.mk`, or `CMakeLists.txt` | `ndk-build` or CMake |
+| **AOSP platform, legacy** | Platform/OS developers, older code | `Android.mk` | Kati → Ninja |
+| **AOSP platform, current** | Platform/OS developers, current code | `Android.bp` | Soong → Ninja |
+
+The `Android.mk` of the NDK and the `Android.mk` of the old AOSP tree share a
+syntax and a name but are read by completely different build systems with
+different variable sets. Note which world a tutorial is describing.
+
+---
+
+### 9.2 Android.mk — the NDK build
+
+A minimal one:
+
+```make
+LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE    := hello
+LOCAL_SRC_FILES := hello.cpp
+LOCAL_CPPFLAGS  := -std=c++17
+
+include $(BUILD_SHARED_LIBRARY)
+```
+
+**There are no targets, no `:` rules, and no TAB-indented recipes.** Nothing in
+this file describes *how* to compile anything.
+
+Instead you set `LOCAL_*` variables and then `include` a script the NDK
+provides. That script reads your variables and generates the real rules —
+cross-compiler paths, sysroot, ABI flags, `.so` packaging, all of it.
+
+You are filling in a form. `ndk-build` writes the Makefile.
+
+#### The required skeleton
+
+| Line | Why it is mandatory |
+| ---- | ------------------- |
+| `LOCAL_PATH := $(call my-dir)` | Must be first. `my-dir` is an NDK function returning the directory of this file, so sources can be named relatively |
+| `include $(CLEAR_VARS)` | Resets every `LOCAL_*` variable. Required before **each** module, because one file may define several and they would otherwise leak into each other |
+| `include $(BUILD_*)` | Must be last for the module. This is what actually generates the rules |
+
+`CLEAR_VARS` deliberately does **not** clear `LOCAL_PATH` — that is the one
+variable meant to persist across modules in a file.
+
+#### Common LOCAL_ variables
+
+| Variable | Sets |
+| -------- | ----- |
+| `LOCAL_MODULE` | Module name. `hello` produces `libhello.so` |
+| `LOCAL_SRC_FILES` | Source files, relative to `LOCAL_PATH` |
+| `LOCAL_C_INCLUDES` | Header search paths |
+| `LOCAL_CFLAGS` | Flags for C **and** C++ |
+| `LOCAL_CPPFLAGS` | Flags for C++ only |
+| `LOCAL_LDFLAGS` | Linker flags |
+| `LOCAL_LDLIBS` | System libraries, e.g. `-llog -landroid` |
+| `LOCAL_STATIC_LIBRARIES` | Static modules to link |
+| `LOCAL_SHARED_LIBRARIES` | Shared modules to link |
+| `LOCAL_EXPORT_C_INCLUDES` | Include paths passed on to anything that depends on this module |
+
+#### The BUILD_ scripts
+
+| Include | Produces |
+| ------- | -------- |
+| `$(BUILD_SHARED_LIBRARY)` | `lib<name>.so` — the usual choice for an APK |
+| `$(BUILD_STATIC_LIBRARY)` | `lib<name>.a` — linked into others, not packaged |
+| `$(BUILD_EXECUTABLE)` | A command-line binary |
+| `$(PREBUILT_SHARED_LIBRARY)` | Wraps an existing `.so` as a module |
+
+#### Several modules in one file
+
+This is why `CLEAR_VARS` exists:
+
+```make
+LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE    := mathutils
+LOCAL_SRC_FILES := math.cpp
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE           := hello
+LOCAL_SRC_FILES        := hello.cpp
+LOCAL_STATIC_LIBRARIES := mathutils
+LOCAL_LDLIBS           := -llog
+include $(BUILD_SHARED_LIBRARY)
+```
+
+#### Application.mk
+
+A companion file for project-wide settings, not per-module ones:
+
+```make
+APP_ABI      := arm64-v8a armeabi-v7a x86_64
+APP_PLATFORM := android-24
+APP_STL      := c++_shared
+APP_OPTIM    := release
+APP_CPPFLAGS := -std=c++17
+```
+
+| Variable | Sets |
+| -------- | ----- |
+| `APP_ABI` | Which CPU architectures to build. `all` builds every supported one |
+| `APP_PLATFORM` | Minimum Android API level |
+| `APP_STL` | Which C++ standard library — `c++_shared`, `c++_static`, or `none` |
+| `APP_OPTIM` | `release` or `debug` |
+
+`APP_ABI` is the reason one build produces several binaries: the whole build
+runs once per architecture, into `libs/<abi>/`.
+
+#### Running it
+
+```bash
+ndk-build                    # from the folder containing jni/Android.mk
+ndk-build -j8 NDK_DEBUG=1    # parallel, debug build
+ndk-build clean
+```
+
+#### Status
+
+**`Android.mk` is legacy.** Google recommends **CMake** for new NDK projects,
+and Android Studio defaults to it. `Android.mk` still works and a lot of
+existing code uses it, but new native Android code should use
+`CMakeLists.txt`.
+
+---
+
+### 9.3 Android.bp — Soong
+
+Around Android 7–8, the AOSP platform build moved off `Android.mk` to
+`Android.bp`.
+
+The reason: `Android.mk` files are **programs**. They can contain conditionals,
+loops, shell invocations and recursive variable expansion, which means the only
+way to know what a build does is to run it. At AOSP's scale that made builds
+slow, unpredictable, and nearly impossible to analyse statically.
+
+`Android.bp` is the opposite. It is **pure declarative data** — deliberately not
+a scripting language.
+
+```blueprint
+cc_binary {
+    name: "hello",
+    srcs: ["hello.cpp"],
+    shared_libs: ["liblog"],
+    cflags: ["-Wall", "-Werror"],
+}
+```
+
+The syntax is JSON-like: `module_type { property: value, ... }`. Strings are
+double-quoted, lists use `[]`, maps use `{}`, and **trailing commas are
+required**.
+
+#### What it deliberately cannot do
+
+| Not supported | Why |
+| ------------- | --- |
+| `if` / conditionals | Would make the file unanalysable |
+| Loops | Same |
+| Arithmetic | Same |
+| Shell commands | Same |
+| Arbitrary variables | Only simple local assignment is allowed |
+
+Anything genuinely needing logic goes into a **Soong plugin written in Go**, or
+uses `soong_config_variables`. This is a constraint by design, not an omission.
+
+#### Common module types
+
+| Type | Produces |
+| ---- | -------- |
+| `cc_binary` | Native executable |
+| `cc_library` | Both shared and static variants |
+| `cc_library_shared` | `.so` only |
+| `cc_library_static` | `.a` only |
+| `cc_library_headers` | Headers only, no code |
+| `cc_test` | A native test |
+| `java_library` | A `.jar` |
+| `android_app` | An APK |
+| `android_library` | An AAR |
+| `filegroup` | A named set of files usable by other modules |
+| `genrule` | Generate files by running a tool |
+| `cc_defaults` | A reusable block of properties — not a build output |
+| `prebuilt_etc` | Install a prebuilt file |
+
+#### Common properties
+
+| Property | Means |
+| -------- | ----- |
+| `name` | Unique across the whole tree. Required |
+| `srcs` | Source files. Supports globs like `["src/**/*.cpp"]` |
+| `exclude_srcs` | Remove files matched by a glob |
+| `shared_libs` | Shared libraries to link |
+| `static_libs` | Static libraries to link |
+| `header_libs` | Header-only dependencies |
+| `include_dirs` | Include paths — absolute from the tree root |
+| `local_include_dirs` | Include paths relative to this `Android.bp` |
+| `export_include_dirs` | Include paths passed on to dependents |
+| `cflags` | Compiler flags |
+| `defaults` | Inherit from a `cc_defaults` module |
+| `host_supported` | Also build for the host machine |
+| `vendor` / `product` | Which partition it installs to |
+
+#### Reuse with cc_defaults
+
+There are no variables, so shared settings use a `cc_defaults` module:
+
+```blueprint
+cc_defaults {
+    name: "my_defaults",
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-std=c++17",
+    ],
+    shared_libs: ["liblog"],
+}
+
+cc_binary {
+    name: "hello",
+    defaults: ["my_defaults"],
+    srcs: ["hello.cpp"],
+}
+
+cc_library_shared {
+    name: "libgreet",
+    defaults: ["my_defaults"],
+    srcs: ["greet.cpp"],
+    export_include_dirs: ["include"],
+}
+```
+
+#### Per-architecture and per-target settings
+
+Instead of conditionals, `Android.bp` uses nested property blocks:
+
+```blueprint
+cc_library_shared {
+    name: "libexample",
+    srcs: ["common.cpp"],
+
+    arch: {
+        arm64: {
+            srcs: ["arm64_impl.cpp"],
+            cflags: ["-DARM64"],
+        },
+        x86_64: {
+            srcs: ["x86_impl.cpp"],
+        },
+    },
+
+    target: {
+        android: {
+            shared_libs: ["liblog"],
+        },
+        host: {
+            cflags: ["-DHOST_BUILD"],
+        },
+    },
+}
+```
+
+Soong merges the matching blocks into the base properties. Declarative, and
+still statically analysable.
+
+#### Tooling
+
+```bash
+bpfmt -w Android.bp          # canonical formatter. Run before committing
+androidmk Android.mk > Android.bp   # convert legacy .mk (partial, needs review)
+```
+
+`androidmk` handles simple files. Anything using conditionals or shell will need
+manual work, because those concepts do not exist in `Android.bp`.
+
+---
+
+### 9.4 How the pieces fit together
+
+Neither Soong nor Kati compiles anything. Both are **generators** — they emit
+Ninja files, and Ninja does the work.
+
+```
+     Android.bp                    Android.mk
+    (Soong modules)             (legacy + product config)
+         |                              |
+         v                              v
+    +---------+                    +---------+
+    |  Soong  |                    |  Kati   |
+    | (Go)    |                    | (C++)   |
+    +---------+                    +---------+
+         |                              |
+         +--------------+---------------+
+                        v
+                   build.ninja
+                        |
+                        v
+                    +-------+
+                    | Ninja |     <-- actually runs the compiler
+                    +-------+
+                        |
+                        v
+                      out/
+```
+
+| Piece | Is |
+| ----- | -- |
+| **Blueprint** | The file *format* and its parser. A generic library, not Android-specific |
+| **Soong** | The Android-specific build system built on Blueprint. Written in Go. Turns `Android.bp` into Ninja |
+| **Kati** | A Google tool that converts remaining `Android.mk` — mostly product configuration — into Ninja instead of running GNU Make |
+| **Ninja** | A deliberately dumb, very fast executor. Does not parse logic; just runs a precomputed dependency graph |
+| **soong_ui** | The orchestrator invoked by `m`. Runs Kati and Soong, merges the output, then calls Ninja |
+
+The design principle: put all the logic in the **generation** step, so the
+**execution** step is a flat graph that parallelises perfectly. That is why
+Ninja is fast, and why `Android.bp` is not allowed to contain logic.
+
+Product configuration (`BoardConfig.mk`, `device.mk`, the `AndroidProducts.mk`
+files) is **still GNU Make** — that part has not migrated, which is why Kati
+still exists.
+
+---
+
+### 9.5 Building AOSP
+
+```bash
+source build/envsetup.sh     # adds lunch, m, mm, mmm to the shell
+lunch aosp_arm64-eng         # pick target: <product>-<variant>
+m -j16                       # build everything from the tree root
+```
+
+| Command | Does |
+| ------- | ---- |
+| `m` | Build the whole tree, from anywhere |
+| `mm` | Build only the module in the current directory |
+| `mmm <path>` | Build the module at that path |
+| `mma` | Build the current module **and** its dependencies |
+| `m <module>` | Build one named module |
+| `m clean` | Remove `out/` |
+
+Build variants: `eng` (development, extra debugging), `userdebug` (like a
+release build but rootable), `user` (what ships).
+
+Everything lands in `out/` — nothing is written next to the source. Same
+principle as the `build/` habit in [section 1](#1-the-build-habit), at a scale
+of hundreds of thousands of files.
+
+> A note on Bazel: Google announced a long-term plan to move AOSP to Bazel. It
+> has seen limited adoption and the timeline has shifted repeatedly, so treat
+> any claim about its current status as needing verification against the AOSP
+> documentation.
+
+---
+
+### 9.6 Side by side
+
+| | Your Makefile | Android.mk (NDK) | Android.bp |
+| --- | --- | --- | --- |
+| Language | GNU Make | GNU Make | Blueprint (declarative) |
+| You write | Rules and recipes | Variable assignments | Module declarations |
+| Rules come from | You | NDK scripts | Soong |
+| Logic allowed | Yes | Yes | **No** |
+| TAB-indented recipes | Required | None | None |
+| Runs the compiler | make | make | Ninja |
+| Command | `make` | `ndk-build` | `m` |
+| Targets built | This Mac, arm64 | Every ABI in `APP_ABI` | Whole device image |
+| Status | Current | Legacy — use CMake | Current for AOSP |
+
+### 9.7 What transfers
+
+From the earlier sections, the portable parts are `:=`, `$(VAR)`, `include`, and
+the dependency-graph model. They appear in `Android.mk`, in kernel builds, and in
+most C/C++ projects on Linux.
+
+The part `Android.mk` and `Android.bp` both hide is the half you actually write
+in [section 5](#5-the-makefile) — your own targets, prerequisites and recipes.
+That is the more valuable half to understand, because it is exactly what
+ndk-build, Soong, Kati and CMake all generate underneath.
+
+---
+
+## 10. Common Errors
 
 | Error | Cause |
 | ----- | ----- |
@@ -603,16 +1025,19 @@ expanded, which instantly exposes a mistyped flag or an empty variable.
 | `build/` shows in `git status` | `.gitignore` is not at the repo root, or was saved as `gitignore` without the dot |
 | Binary still tracked after ignoring | It was already committed. Use `git rm --cached` |
 | `command not found: ./build/...` | Missing `./`, or the build failed and the binary was never created |
+| `make: ./build/: Permission denied` | Using the old `run: $(BUILD)/$(F)` form without `F=`. `$(F)` expanded to nothing so the recipe tried to execute the `build/` **directory**. Switch to the `run-%` rule |
+| `No rule to make target 'run-foo'` | No `foo.cpp` in the folder. Run `make list` to see the real names |
 | `cd` in a recipe has no effect | Each recipe line is a separate shell. Chain with `&&` |
 
 ---
 
-## 10. Quick Reference
+## 11. Quick Reference
 
 ```bash
 # Daily use
 make                       # build everything changed
-make run F=linked_list     # build and run one program
+make list                  # show available program names
+make run-linked_list       # build and run one program
 make asan                  # rebuild with the sanitizers
 make clean                 # delete build/
 
@@ -625,13 +1050,33 @@ make --debug=b             # why did/didn't it rebuild
 mkdir -p build && g++ -std=c++17 -Wall -Wextra -g linked_list.cpp -o build/linked_list && ./build/linked_list
 
 # Checking tabs
-awk '/^\t/{n++} END{print n+0}' Makefile     # expect 4
+awk '/^\t/{n++} END{print n+0}' Makefile     # expect 5
 cat -t Makefile                              # tabs show as ^I
 
 # Git
 git status --untracked-files=all             # see inside new folders
 git check-ignore -v <path>                   # which rule ignored it
 git rm --cached <file>                       # untrack an already-committed binary
+```
+
+### Android
+
+```bash
+# NDK (Android.mk)
+ndk-build                                    # build from jni/Android.mk
+ndk-build -j8 NDK_DEBUG=1
+ndk-build clean
+
+# AOSP (Android.bp)
+source build/envsetup.sh                     # adds lunch, m, mm, mmm
+lunch aosp_arm64-eng                         # <product>-<variant>
+m -j16                                       # build the whole tree
+mm                                           # build only this directory's module
+m <module>                                   # build one named module
+
+# Android.bp tooling
+bpfmt -w Android.bp                          # format before committing
+androidmk Android.mk > Android.bp            # convert legacy (partial)
 ```
 
 ### Automatic variables
@@ -644,7 +1089,7 @@ git rm --cached <file>                       # untrack an already-committed bina
 
 1. `mkdir MALIKH_CODES/NewTopic && cd MALIKH_CODES/NewTopic`
 2. Copy the [Makefile](#the-file) into it, unchanged
-3. Verify the tabs: `awk '/^\t/{n++} END{print n+0}' Makefile` → 4
-4. Write the `.cpp`, then `make && make run F=<name>`
+3. Verify the tabs: `awk '/^\t/{n++} END{print n+0}' Makefile` → 5
+4. Write the `.cpp`, then `make && make run-<name>`
 
 The root `.gitignore` already covers the new `build/` folder. Nothing to add.

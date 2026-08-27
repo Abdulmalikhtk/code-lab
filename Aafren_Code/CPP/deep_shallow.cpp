@@ -75,3 +75,34 @@ int main() {
     cout<<"t1 and t2 are "<<(t1==t2? "equal":"Not equal")<<endl;
     return 0;
 }
+
+
+/*
+
+t1 object----------
+name:Charlie Age:27
+----------------------------------------
+t2 object----------------
+name:Daniel Age:30
+----------------------------------------
+t3 object deep copy-----------
+Deep copy-------------
+name:Charlie Age:27
+name:Charlie Age:27
+----------------------------------------
+t4 object shallow copy------
+Shallow copy------------
+name:Daniel Age:30
+name:Daniel Age:30
+----------------------------------------
+t4 object name change shallow copy------
+name:bob Age:30
+name:bob Age:30
+----------------------------------------
+t2 object name change deep copy------
+name:alice Age:27
+name:Charlie Age:27
+----------------------------------------
+t1 and t2 are Not equal
+
+*/

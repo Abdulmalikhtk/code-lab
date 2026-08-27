@@ -9,10 +9,11 @@ OOPS:
 2. Access Specifiers
 3. Class
 4. Object
-    2.a Normal Object Creation
-    2.b Pointer Object Creation
-    2.c Base Class pointer Object Creation
-    2.d Derived Class pointer Object Creation
-    2.e Base and Desrived Class pointer Object Creation
+    2.a Normal Object Creation // class A {}; int main() { A a; // Stack allocation }
+    2.b Pointer Object Creation // class A {}; int main() { A* a = new A(); // Heap allocation via pointer delete a;       // Clean up memory }
+    2.c Base Class pointer Object Creation // class A {};class B : public A {};int main() {A* a = new B(); // Base pointer, Derived objectdelete a;}
+    2.d Derived Class pointer Object Creation //class A {};class B : public A {};int main() {B* b = new B(); // Derived pointer, Derived object delete b;}
+    2.e Base and Desrived Class pointer Object Creation // class A {};class B : public A {};int main() { A* basePtr = new B(); // Polymorphic pointer B* derivedPtr = new B(); // Direct pointer delete basePtr;delete derivedPtr;}
+
 
 5.Basic Inheritance Base Derived

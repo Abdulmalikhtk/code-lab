@@ -1,0 +1,40 @@
+🔑 Keyword & Concept Cheat Sheet
+* std::thread
+    * Analogy: Hiring a new worker to do a specific job independently.
+    * System Example: A web browser using one thread to render UI text and another background thread to download an image.
+    * Interview Summary: The standard C++ class used to spawn and execute a function asynchronously on a separate execution path.
+* std::mutex (Mutual Exclusion)
+    * Analogy: A key-operated lock on the single bathroom door inside the house.
+    * System Example: Multiple threads wanting to increment a global total_bank_balance variable at the same time.
+    * Interview Summary: A synchronization primitive used to protect shared data from being written to by multiple threads simultaneously (prevents data races).
+* std::lock_guard
+    * Analogy: A smart door lock that automatically locks when you walk in and unlocks the moment you exit the room.
+    * System Example: Wrapping a cout statement so text from different threads never scrambles together on the screen.
+    * Interview Summary: A strict RAII wrapper that acquires a mutex upon creation and automatically releases it when it goes out of scope.
+* std::unique_lock
+    * Analogy: A padlock where you can lock and unlock it manually multiple times while inside the room.
+    * System Example: Pausing a video processing thread to wait for a frame, releasing the lock, and locking it again when the frame arrives.
+    * Interview Summary: A flexible RAII lock wrapper that supports advanced features like deferred locking, manual unlocking/relocking, and condition variables.
+* std::condition_variable
+    * Analogy: An alarm clock or a pager that lets a worker take a nap until the raw materials arrive.
+    * System Example: A delivery truck thread waiting silently until the warehouse thread finishes packing boxes into the buffer queue.
+    * Interview Summary: A signaling mechanism used to safely block a thread until notified by another thread that a specific state condition is met.
+* Spurious Wakeup
+    * Analogy: Waking up in the middle of the night thinking your alarm went off, checking the clock, and realizing you should go back to sleep.
+    * System Example: An operating system quirk where a thread unblocks from a condition variable without receiving an explicit signal.
+    * Interview Summary: A phenomenon handled by passing a boolean predicate (lambda) into cv.wait() to force the thread to verify the condition before moving forward.
+* .join()
+    * Analogy: Waiting at the restaurant table until your friend arrives before you both walk inside together.
+    * System Example: The main program waiting for a heavy database loading thread to finish completely before rendering the final application dashboard.
+    * Interview Summary: A blocking call that halts the calling thread until the target background thread finishes its execution.
+* .detach()
+    * Analogy: Launching a roomba vacuum cleaner and letting it run independently in the background while you leave the house completely.
+    * System Example: Fire-and-forget logging threads that continuously write analytics to a file without the main application caring when they finish.
+    * Interview Summary: Severs the connection to the thread object, allowing it to run completely independently in the background managed by the OS.
+* std::atomic
+    * Analogy: A single, unbreakable token that can only be held by one person's hand at a single split second.
+    * System Example: A high-speed transaction counter or a simple shutdown flag (bool run = false) shared across threads.
+    * Interview Summary: A type wrapper that guarantees lock-free, thread-safe read/write operations at the hardware level without the heavy overhead of a mutex.
+* Data Race vs Deadlock
+    * Data Race: Two people trying to write on the exact same piece of paper at the same millisecond, turning the text into illegible scribbles (Undefined Behavior).
+    * Deadlock: Person A has the car keys but needs the garage clicker; Person B has the clicker but needs the car keys—both refuse to share and freeze forever.

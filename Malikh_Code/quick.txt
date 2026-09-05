@@ -15,3 +15,4 @@ Keeping it current
 Since you now have two clones of the same repo, they'll drift. Before working in either one:
 
 git pull
+

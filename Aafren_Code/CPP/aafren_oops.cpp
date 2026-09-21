@@ -13,6 +13,14 @@
 5. Pure Virtual Function
 6. Diamond Problem & Fix
 7. Smart Pointers
+
+//destructor
+//virtual destructor
+//frined funtion
+//friend clss
+//diffrenet object creation based contructor and destructor
+//dangling pointer and how to avoid
+//
 ====================================================================
 */
 
@@ -22,12 +30,12 @@ using namespace std;
 
 class AbstractClass {
 public:
-    AbstractClass() {
-        cout << "AbstractClass Default Constructor Called." << endl;
-    }
-    virtual ~AbstractClass() {
-        cout << "AbstractClass Virtual Destructor Called." << endl;
-    }
+    // AbstractClass() {
+    //     cout << "AbstractClass Default Constructor Called." << endl;
+    // }
+    // virtual ~AbstractClass() {
+    //     cout << "AbstractClass Virtual Destructor Called." << endl;
+    // }
 
     virtual void getPromotion() = 0;
 };
@@ -46,8 +54,9 @@ public:
         cout << "Employee Constructor Called" << endl;
     }
 
-    virtual ~Employee() override {
+    virtual ~Employee() {
         cout << "Employee Destructor Called" << endl;
+        // delete ptr;
     }
 
     friend void showSalary(Employee e);
@@ -92,9 +101,7 @@ public:
     }
 };
 
-void showSalary(Employee e) {
-    cout << "Salary: " << e.emp_salary << endl;
-}
+
 
 class Developer : public Employee {
 public:
@@ -105,7 +112,7 @@ public:
         cout << "Developer Constructor Called" << endl;
         emp_work = work;
     }
-    ~Developer() override {
+    ~Developer() {
         cout << "Developer Destructor Called" << endl;
     }
 
@@ -153,6 +160,11 @@ public:
     }
 };
 
+
+void showSalary(Employee e) {
+    cout << "Salary: " << e.emp_salary << endl;
+}
+
 int main() {
     // cout << "--- 1. Creating Dynamic Employee Pointer from Abstract Pointer ---" << endl;
     // AbstractClass* abstractPtr = new Employee("Alice", 31, "Amazon", 300000);
@@ -167,19 +179,45 @@ The actual object initialized in heap memory using new is an Employee object. Th
     // abstractPtr->getPromotion();
     // delete abstractPtr;
 
-    cout << "\n--- 2. Testing Original Smart Pointers & Variables ---" << endl;
-    Employee e("Alice", 31, "Amazon", 300000);
-    // Developer d("developer", "charlie", 31, "Amazon", 400000);
+    // cout << "\n--- 2. Testing Original Smart Pointers & Variables ---" << endl;
 
-    // Employee* e2 = new Developer("developer", "Daneil", 31, "Meta", 600000);
+    // cout<<"-----------Base Class-----------------------"<<endl;
+    // Employee e("Alice", 31, "Amazon", 300000);
+    // cout<<endl;
+    // cout<<"-----------Derived Class-----------------------"<<endl;
+    // Developer d("developer", "charlie", 31, "Amazon", 400000);
+    // d.showDetails();
+    // cout<<endl;
+    // cout<<"-----------Base class pointer with Derived Class-----------------------"<<endl;
+    // Employee* e2 = new Developer("developer", "Daneil", 31, "Meta", 600000); // new keyword means raw pointer
+    // delete e2; // dangling pointer issue
+    // e2=nullptr; // to avoid dangling pointer need assign nullptr to ur pointer variable
+
+
+    // if(e2!=nullptr)
+    // {
+    //     e2->showDetails();
+    // }
+    // else
+    // {
+    //     cout<<"pinter null"<<endl;
+    // }
+    // cout<<"-----------raw pointer-----------------------"<<endl;
+    // //raw pointer
+    // Employee* e2 = new Employee( "Daneil", 31, "Meta", 600000);
+    // // delete e2;
+    // cout<<endl;
+
+    // cout<<"-----------smart pointer-----------------------"<<endl;
+    // //smart pointer
     // unique_ptr<Employee> e1 = make_unique<Employee>("Elizebath", 30, "Meta", 700000);
 
     // e1->showDetails();
     // showSalary(e);
     // e2->showDetails();
 
-    HR h;
-    h.showSalary(e);
+    // HR h;
+    // h.showSalary(e);
 
     // delete e2;
     // e2 = nullptr;
@@ -187,9 +225,9 @@ The actual object initialized in heap memory using new is an Employee object. Th
     // cout << "\n--- 3. Testing Operator Overloading ---" << endl;
     // cout << "Total Salary Combined: " << (e + d) << endl;
 
-    // cout << "\n--- 4. Testing Diamond Problem Solution ---" << endl;
-    // Director dir("Boss Man", 45, "Apple", 1500000);
-    // dir.showDetails();
+    cout << "\n--- 4. Testing Diamond Problem Solution ---" << endl;
+    Director dir("Boss Man", 45, "Apple", 1500000);
+    dir.showDetails();
 
 
     // cout << "=== CASE 1: Employee Pointer pointing to an Employee object ===" << endl;
@@ -210,6 +248,72 @@ The actual object initialized in heap memory using new is an Employee object. Th
     // bonusPtr->Employee::showDetails();
     // delete bonusPtr;
 
-
+    // int* p=new int(20);
+    // delete p;
     return 0;
 }
+
+
+
+/*
+
+|     stack memory           |
+|      a(4 bytes)            |
+|      showSalary()          |
+|                            |
+|            p            |       ------->      | Heap Memory 20|
+|                            |
+|                            |
+
+*/
+
+/*
+
+
+employee -> 2 emp
+   /\
+lead Manager
+   \/
+Director
+
+
+    employee. ->base class
+    |
+    TechLead, Manager -> derived class of Employee base class
+    |
+    Director ->derived class of TechLead,Manager derived class
+
+
+
+Diamond Problem Error:
+
+aafrenfathimam@aafrenfathimam-mac CPP % g++ -std=c++17 aafren_oops.cpp -o aafren_oops
+
+aafren_oops.cpp:147:11: error: type 'Employee' is not a direct or virtual base of 'Director'
+  147 |         : Employee(name, age, comp_name, salary),
+      |           ^~~~~~~~
+aafren_oops.cpp:230:9: error: non-static member 'showDetails' found in multiple base-class subobjects of type
+      'Employee':
+    class Director -> TechLead -> Employee
+    class Director -> Manager -> Employee
+  230 |     dir.showDetails();
+      |         ^
+aafren_oops.cpp:65:18: note: member found by ambiguous name lookup
+   65 |     virtual void showDetails() const {
+      |                  ^
+2 errors generated.
+aafrenfathimam@aafrenfathimam-mac CPP % g++ -std=c++17 aafren_oops.cpp -o aafren_oops
+
+aafrenfathimam@aafrenfathimam-mac CPP % ./aafren_oops
+
+
+Solved O/P:
+--- 4. Testing Diamond Problem Solution ---
+Employee Constructor Called
+TechLead Constructor Called
+Manager Constructor Called
+Director Constructor Called
+Employee Details: Name-Boss Man Age-45 Company-Apple
+Employee Destructor Called
+aafrenfathimam@aafrenfathimam-mac CPP %
+*/

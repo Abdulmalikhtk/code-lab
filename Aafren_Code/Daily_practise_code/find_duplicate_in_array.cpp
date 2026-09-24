@@ -46,3 +46,50 @@ int main() {
 
     return 0;
 }
+
+
+
+// alternate method
+/*
+#include <iostream>
+using namespace std;
+
+int main() {
+    int arr[]={1,2,3,4,3,5,6,7,8,9,7};
+    int n=sizeof(arr)/sizeof(arr[0]);
+    int k=0;                     // size of the unique part
+
+    for(int i=0;i<n;i++)
+    {
+        bool isDuplicate=false;
+
+        for(int j=0;j<k;j++)     // compare only against what we kept
+        {
+            if(arr[i]==arr[j])
+            {
+                isDuplicate=true;
+                break;
+            }
+        }
+
+        if(!isDuplicate)
+        {
+            arr[k]=arr[i];       // keep it
+            k++;
+        }
+    }
+
+    cout<<"after removing duplicates: ";
+    for(int i=0;i<k;i++)
+    {
+        cout<<arr[i]<<",";
+    }
+    cout<<endl;
+
+    cout<<"removed "<<n-k<<" duplicates"<<endl;
+
+    return 0;
+}
+
+
+*/

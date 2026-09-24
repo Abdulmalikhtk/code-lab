@@ -15,6 +15,14 @@ int main() {
             cout<<arr[i]<<",";
             count++;
             break;
+
+            // to remove duplicate from array use this below loop
+        //     for(int k=j;k<n-1;k++)  // shift everything left by one
+        //         {
+        //             arr[k]=arr[k+1];
+        //         }
+        //         n--;                    // list is now one shorter
+        //         j--;                    // recheck this index
         }
         }
     }
@@ -27,5 +35,14 @@ int main() {
     {
         cout<<"dubplicate found";
     }
+
+    // to remove duplicate from array use this below loop
+    // cout<<"after removing duplicates: ";
+    // for(int i=0;i<n;i++)
+    // {
+    //     cout<<arr[i]<<",";
+    // }
+    // cout<<endl;
+
     return 0;
 }

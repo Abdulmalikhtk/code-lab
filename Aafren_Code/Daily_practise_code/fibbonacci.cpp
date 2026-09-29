@@ -1,6 +1,7 @@
 // Online C++ compiler to run C++ program online
 #include <iostream>
 #include<string>
+using namespace std;
 
 void fibbonacci_number()
 {
@@ -18,7 +19,7 @@ void fibbonacci_number()
         }
         a=b;
         b=result;
-        cout<<"Fibbonacci of "<<n<<" is:"<<result<<endl;
+        cout<<"Fibbonacci of series "<<result<<endl;
     }
 
 }

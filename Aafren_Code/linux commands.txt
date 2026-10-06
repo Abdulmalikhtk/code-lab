@@ -1,0 +1,45 @@
+mkdir
+cd 
+mv
+cp 
+grep -nr 
+find -name 
+ls -lrt
+cat 
+zip 
+tar
+untar
+unzip
+touch
+vi
+chmod 
+sudo 
+su
+pwd
+rm 
+df -h
+du -sh
+se nu
+
+grep -nr "hal_init(" --exclude-dir='samsung' 
+
+
+1.Open source operating system based on UNIX.
+	1.Kernel space:
+		a. Kernel, device drivers, kernel modules will run
+		b. This kernel space access both user and kernel space
+	2.User space:
+		a. Normal user process will run
+		b. User space cannot access kernel memory only have acess for limited part of memory
+		c. User space proceessor only access the small part of kernel via interface only exposed bu the kernel(system call)
+		
+This two separation is used for If some issue happens in the user space application it should not affect the complete kernel 
+
+
+Linux kernel module:
+Piece of code that can be loaded and unloaded into the kernel upon demand.
+Kernel modules can be loaded to the kernel in two ways
+	1.Static 
+	2.Dynamically
+	
+	

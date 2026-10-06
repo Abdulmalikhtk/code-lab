@@ -1,0 +1,93 @@
+Git
+	Git is a free and open source distributed version control system. Android uses Git for local operations such as branching, commits, diffs, and edits. 
+	For help learning Git, refer to the Git documentation.
+
+
+
+Git Commands:
+git  confit user.name "Name"
+git config user.email "email"
+git init
+git branch
+git branch -a
+git status
+git log
+git diff
+git branch "branch_name"
+git log --oneline
+git checkout "branch_name"
+git commit -a -m "message"
+git commit --amend
+git clone "url"
+git pull
+git log "branch_name" --oneline
+git cherrry-pick commit_id 
+git add
+git add .
+git add --all
+git add *.txt
+git add "*.txt"
+git add /folder
+git add /folder/*.txt
+git revert "commit_id"
+git merge "branch_name"
+git branch -d "branch_name"
+git tag
+git checkout "tag_name"
+git fetch
+git stash
+git stash pop
+git stash clear
+git remote -v
+git -version
+git rebase
+git stash list
+git diff > "fine_name (test.patch)" 
+git apply "path_file_name (test.patch)"
+Git format-patch -<number of patch> commit ids
+Git am --3 pwd/001
+
+
+
+git log  --> to view all repo commit
+
+git log branch_name --> to view commits of particular branch
+
+git log branch_name --oneline --> to get commmit details in minimal format
+
+
+To cherry-pick the changes 
+
+git checkout to ur branch --> in which branch you need to add cherry pick changes 
+
+git cherrry-pick commit_id --> commit id of the chages u wnated here
+
+to take patch 
+git diff . > file-name.patch
+to apply patch
+git apply <patch-filename>
+
+
+
+git clone source url
+git checkout branch
+git log .
+
+1.need to crate patch
+git format-patch -3 f79b1e99ef101881ff2018d33fc16365dc3fc3d4dd c9c56f20c0677069796c325f6bad8a01dde840b24df 69423256f057cde0e4def4298703b21da611f17a6b4
+git format-patch -26 f79b1e99ef101881ff201823dfc16365dc3fc3d4dd c9c6656f20c0069796c325f6bad8a01dde840b24df 69423f0678957cde0e4def4298703b21da611f17a6b4
+
+ls
+
+2. git clone destination url
+git checkout branch
+git am --3 <pwd>/0001
+git status 
+git add 
+git am --continue
+git status
+git am --abort
+
+
+
+

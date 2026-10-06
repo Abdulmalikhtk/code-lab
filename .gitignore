@@ -8,6 +8,7 @@ build/
 *.app
 *.dSYM/
 a.out
+*_out
 
 # Never ignore source or notes, no matter what matched above
 !*.cpp

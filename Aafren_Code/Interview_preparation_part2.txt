@@ -1,0 +1,262 @@
+android_aosp_end_to_end_architecture
+html
+
+Android Architecture
+Android is organized into layers so applications remain independent of hardware details:
+
+Applications: WhatsApp, Instagram, Settings, Launcher and other system/user apps.
+Framework: APIs and services such as ActivityManager, PackageManager, WindowManager, DisplayManager and AudioManager.
+Runtime and native services: ART executes Java/Kotlin code; services such as SurfaceFlinger and AudioFlinger handle graphics and audio.
+HAL: Provides standard interfaces for audio, camera, display, sensors, Bluetooth and other hardware.
+Linux kernel: Contains process scheduling, memory management, Binder, security and device drivers.
+Hardware: CPU, GPU, display, touchscreen, microphone, speaker, camera and sensors.
+Common Android libraries include Bionic C library, libbinder for IPC, liblog for logging, Skia for 2D graphics, SQLite for databases, MediaCodec for multimedia, and EGL/OpenGL ES/Vulkan for graphics.
+
+App Click to Display Hardware
+When you tap the WhatsApp or Instagram icon:
+
+Touch controller
+  -> Kernel input driver
+  -> EventHub
+  -> InputReader
+  -> InputDispatcher
+  -> Launcher
+  -> ActivityTaskManager
+  -> Zygote creates the application process
+  -> ART executes application code
+  -> App renders a graphic buffer
+  -> SurfaceFlinger combines application surfaces
+  -> Composer HAL
+  -> Kernel display driver
+  -> Display panel
+The touchscreen generates a hardware interrupt. The kernel converts it into an input event, Android dispatches it to Launcher, and ActivityTaskManager starts the selected application.
+
+Boot, Build and Security
+Bootloader
+The bootloader is the first software that runs after Boot ROM. It initializes essential hardware such as RAM and clocks, verifies the Android images using Android Verified Boot, and loads the kernel, ramdisk and device tree.
+
+Boot ROM -> Bootloader -> Linux kernel -> init -> Zygote
+         -> system_server -> Launcher -> Applications
+The kernel starts Android init as PID 1. init mounts partitions, loads SELinux policy, starts native services, and starts Zygote.
+
+AOSP Build System
+Most Android modules are defined using Android.bp. Soong reads these files and generates Ninja build instructions; legacy Android.mk files are processed through Kati.
+
+Source code
+  -> Android.bp / Android.mk
+  -> Soong / Kati
+  -> Ninja
+  -> Compiler and linker
+  -> APK, JAR and native binaries
+  -> boot, system, vendor and product images
+Typical commands are:
+
+source build/envsetup.sh
+lunch <device>-userdebug
+m
+user is for production, userdebug supports debugging with production-like behavior, and eng enables additional development facilities.
+
+SELinux and SEPolicy
+SELinux provides mandatory access control. Linux permissions may say that a process can access a file, but SELinux can still deny it based on the process domain and resource type.
+
+For example, an audio HAL should access audio device nodes but should not read application-private data. Policy files define domains, labels, transitions and minimum required permissions. Denials appear in logs as avc: denied.
+
+init.rc
+init.rc files tell Android init which native services to start and under which user, group, capabilities and conditions.
+
+service sample_hal /vendor/bin/hw/sample_hal
+    class hal
+    user system
+    group system
+    disabled
+
+on property:vendor.sample.enable=1
+    start sample_hal
+They are also used for property triggers, boot actions, directory creation, permissions and service restart behavior.
+
+HAL, Audio and ioctl
+Why HAL Is Required
+HAL means Hardware Abstraction Layer. It provides a standard interface between the Android framework and vendor-specific hardware implementations.
+
+The framework calls the same Audio HAL interface regardless of whether the device uses Qualcomm, MediaTek or another chipset. This supports Project Treble and allows framework and vendor components to evolve more independently.
+
+Modern HALs normally use stable AIDL; older implementations may use HIDL or legacy C interfaces. VINTF manifests declare which HAL services a device provides.
+
+Audio Playback Example
+When playing a WhatsApp voice message:
+
+WhatsApp
+  -> MediaPlayer or AudioTrack
+  -> AudioPolicyService selects speaker/Bluetooth route
+  -> AudioFlinger mixes audio
+  -> Audio AIDL HAL
+  -> Vendor DSP/tinyalsa library
+  -> ALSA kernel driver
+  -> Audio codec and amplifier
+  -> Speaker
+Common application APIs include AudioManager, AudioTrack, AudioRecord and MediaPlayer. Common modern Audio HAL operations include opening input/output streams, configuring audio ports and patches, and updating stream metadata.
+
+Legacy Audio HAL implementations commonly contain functions such as:
+
+adev_open_output_stream();
+adev_open_input_stream();
+out_write();
+in_read();
+adev_set_mode();
+adev_set_mic_mute();
+ioctl() Calls
+ioctl() sends a device-specific command to a kernel driver:
+
+int result = ioctl(fileDescriptor, request, argument);
+Applications normally do not call hardware ioctl() directly. The HAL or a native library such as tinyalsa performs it after opening the relevant device node.
+
+Common ALSA audio requests include:
+
+SNDRV_PCM_IOCTL_HW_PARAMS
+SNDRV_PCM_IOCTL_PREPARE
+SNDRV_PCM_IOCTL_START
+SNDRV_PCM_IOCTL_DROP
+For camera drivers, common V4L2 requests include VIDIOC_REQBUFS, VIDIOC_QBUF, VIDIOC_STREAMON, VIDIOC_DQBUF and VIDIOC_STREAMOFF.
+
+Interview summary: The application uses framework APIs, Binder connects framework services to HAL services, HAL converts Android requests into vendor-specific operations, and kernel drivers finally control the physical hardware.
+
+Android Audio Playback Flow
+Application
+   AudioTrack / MediaPlayer / AAudio
+          |
+          v
+AudioPolicyService
+   Selects speaker, headset or Bluetooth
+          |
+          v
+AudioFlinger
+   Mixes, resamples and controls audio streams
+          |
+          v
+Audio HAL
+   Opens and configures output stream
+          |
+          v
+tinyalsa / ALSA userspace library
+   pcm_open(), pcm_writei(), mixer controls
+          |
+          v
+ALSA kernel PCM driver
+   ioctl(), DMA and interrupts
+          |
+          v
+I2S/TDM -> Audio codec -> Amplifier -> Speaker
+Common Audio APIs
+Application APIs
+AudioTrack     // Play PCM audio
+AudioRecord    // Capture PCM audio
+MediaPlayer    // Play compressed media
+AudioManager   // Volume, mode and device management
+AAudio         // Low-latency native audio
+Example application-level operation:
+
+audioTrack.play();
+audioTrack.write(buffer, size);
+Common Audio HAL Operations
+Modern Android uses AIDL Audio HAL interfaces. Common operations include:
+
+openOutputStream()
+openInputStream()
+setAudioPortConfig()
+setAudioPatch()
+resetAudioPatch()
+getAudioPorts()
+getAudioRoutes()
+Legacy Audio HAL implementations commonly use:
+
+adev_open_output_stream()
+adev_open_input_stream()
+out_write()
+in_read()
+out_standby()
+adev_set_mode()
+adev_set_mic_mute()
+Common tinyalsa APIs
+The Audio HAL usually uses tinyalsa instead of calling ALSA ioctl() directly.
+
+pcm_open()       // Open PCM playback or capture device
+pcm_prepare()    // Prepare the stream
+pcm_start()      // Start PCM transfer
+pcm_writei()     // Write playback frames
+pcm_readi()      // Read capture frames
+pcm_stop()       // Stop the stream
+pcm_close()      // Close the device
+Mixer control APIs include:
+
+mixer_open()
+mixer_get_ctl_by_name()
+mixer_ctl_set_value()
+mixer_ctl_set_enum_by_string()
+mixer_close()
+Example:
+
+struct pcm* pcmDevice =
+    pcm_open(0, 0, PCM_OUT, &pcmConfig);
+
+if (pcmDevice != nullptr && pcm_is_ready(pcmDevice)) {
+    pcm_writei(pcmDevice, audioBuffer, frameCount);
+    pcm_close(pcmDevice);
+}
+ALSA Driver and ioctl() Flow
+When the HAL calls pcm_open(), tinyalsa opens a PCM device node:
+
+open("/dev/snd/pcmC0D0p", O_RDWR);
+Here:
+
+C0 means sound card 0.
+D0 means PCM device 0.
+p means playback.
+c would mean capture.
+Tinyalsa then uses ALSA ioctl() calls internally:
+
+ioctl(fd, SNDRV_PCM_IOCTL_HW_PARAMS, &hwParams);
+ioctl(fd, SNDRV_PCM_IOCTL_SW_PARAMS, &swParams);
+ioctl(fd, SNDRV_PCM_IOCTL_PREPARE);
+ioctl(fd, SNDRV_PCM_IOCTL_START);
+ioctl(fd, SNDRV_PCM_IOCTL_WRITEI_FRAMES, &frames);
+ioctl(fd, SNDRV_PCM_IOCTL_DRAIN);
+ioctl(fd, SNDRV_PCM_IOCTL_DROP);
+Important PCM ioctl() Calls
+SNDRV_PCM_IOCTL_HW_PARAMS: Configures sample rate, channel count, sample format, period size and buffer size.
+SNDRV_PCM_IOCTL_SW_PARAMS: Configures start threshold, stop threshold and available minimum frames.
+SNDRV_PCM_IOCTL_PREPARE: Prepares the stream before data transfer.
+SNDRV_PCM_IOCTL_START: Starts DMA-based audio transfer.
+SNDRV_PCM_IOCTL_WRITEI_FRAMES: Sends interleaved playback frames.
+SNDRV_PCM_IOCTL_READI_FRAMES: Receives interleaved capture frames.
+SNDRV_PCM_IOCTL_DRAIN: Waits until remaining playback data finishes.
+SNDRV_PCM_IOCTL_DROP: Immediately stops the stream.
+Complete Playback Sequence
+1. App calls AudioTrack.play() and write().
+2. AudioPolicy selects the output device.
+3. AudioFlinger mixes the application audio.
+4. Audio HAL opens an output stream.
+5. HAL calls tinyalsa pcm_open().
+6. tinyalsa opens /dev/snd/pcmC0D0p.
+7. HW_PARAMS configures rate, channels and format.
+8. SW_PARAMS configures software thresholds.
+9. PREPARE prepares the PCM stream.
+10. WRITEI_FRAMES sends audio frames.
+11. ALSA driver configures DMA.
+12. DMA sends data through I2S/TDM.
+13. Audio codec converts digital samples to analog.
+14. Amplifier drives the speaker.
+Audio Capture Flow
+Microphone
+  -> Audio codec ADC
+  -> I2S/TDM
+  -> DMA
+  -> ALSA driver
+  -> tinyalsa pcm_readi()
+  -> Audio HAL
+  -> AudioFlinger
+  -> AudioRecord
+  -> Application
+For capture, the important call is:
+
+ioctl(fd, SNDRV_PCM_IOCTL_READI_FRAMES, &frames);
+Interview answer: The application never normally controls the audio driver directly. It uses Android audio APIs, AudioFlinger processes the stream, the Audio HAL converts framework requests into hardware operations, tinyalsa issues ALSA ioctl() calls, and the kernel driver transfers audio using DMA to the codec and speaker.

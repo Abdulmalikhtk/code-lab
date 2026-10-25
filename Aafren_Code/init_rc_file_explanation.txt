@@ -1,0 +1,69 @@
+init.rc Example
+service ipa_analog_gain_init /vendor/bin/init_ipa_analog_gain.sh
+    class late_start
+    user root
+    group root audio
+    disabled
+    oneshot
+
+on property:sys.boot_completed=1
+    start ipa_analog_gain_init
+Meaning:
+
+disabled: Do not start automatically with the service class.
+oneshot: Do not restart the service after the script finishes.
+user and group: Run with permissions required to access audio controls.
+sys.boot_completed=1: Run after Android boot, when the audio card is expected to be ready.
+Shell Script Example
+The script could configure ALSA mixer controls using tinymix:
+
+#!/vendor/bin/sh
+
+TAG="ipa_gain_init"
+TINYMIX="/vendor/bin/tinymix"
+
+log -t "${TAG}" "Configuring IPA analog gain"
+
+"${TINYMIX}" -D 0 "IPA Left Analog Gain" 6
+LEFT_RESULT=$?
+
+"${TINYMIX}" -D 0 "IPA Right Analog Gain" 6
+RIGHT_RESULT=$?
+
+if [ "${LEFT_RESULT}" -eq 0 ] && [ "${RIGHT_RESULT}" -eq 0 ]; then
+    log -t "${TAG}" "IPA analog gain configured successfully"
+else
+    log -t "${TAG}" -p e "Failed to configure IPA analog gain"
+    exit 1
+fi
+
+exit 0
+The control names and gain value 6 are examples. The actual names can be found using:
+
+adb shell tinymix -D 0
+The script must be executable:
+
+chmod 0755 /vendor/bin/init_ipa_analog_gain.sh
+Soong Build Example
+sh_binary {
+    name: "init_ipa_analog_gain",
+    src: "init_ipa_analog_gain.sh",
+    filename: "init_ipa_analog_gain.sh",
+    vendor: true,
+    init_rc: ["init_ipa_analog_gain.rc"],
+}
+This installs the script under /vendor/bin/ and installs its associated init.rc configuration.
+
+Better Trigger
+If the audio HAL provides a property after the sound card is initialized, that is more reliable than waiting for boot completion:
+
+on property:vendor.audio.ipa.ready=1
+    start ipa_analog_gain_init
+This avoids running tinymix before the ALSA sound card and mixer controls are available.
+
+Interview Explanation
+“In an Android device project, we needed to configure the IPA amplifier’s analog gain once during boot. I added a oneshot service in init.rc, which executed a vendor shell script after the audio subsystem was ready.”
+
+“The script used tinymix to set the required ALSA mixer controls. We added logging and checked the command return values so failures could be identified through logcat. We also provided the required SELinux permissions for accessing the ALSA control device.”
+
+“We used oneshot because the gain configuration was required only once. For reliability, triggering it from an audio-ready vendor property was preferable to using a fixed delay.”

@@ -1,0 +1,121 @@
+Below are simple interview examples using easy real-life analogies.
+
+1. Mutex: One Car, One Driver
+A mutex allows only one thread to access a shared resource at a time. Here, the car is the shared resource, so only Alice or Bob can drive it at one time.
+
+#include <chrono>
+#include <iostream>
+#include <mutex>
+#include <thread>
+
+using namespace std;
+
+mutex carMutex;
+
+void driveCar(string driverName) {
+    // Mutex locks here.
+    lock_guard<mutex> lock(carMutex);
+
+    cout << driverName << " is driving the car\n";
+    this_thread::sleep_for(chrono::seconds(2));
+
+    cout << driverName << " stopped the car\n";
+
+    // Mutex automatically unlocks here.
+}
+
+int main() {
+    thread owner1(driveCar, "Alice");
+    thread owner2(driveCar, "Bob");
+
+    owner1.join();
+    owner2.join();
+
+    return 0;
+}
+Possible output:
+
+Alice is driving the car
+Alice stopped the car
+Bob is driving the car
+Bob stopped the car
+lock_guard locks the mutex when it is created and automatically unlocks it when the function scope ends.
+
+2. Semaphore: Two Parking Spaces
+A semaphore maintains a counter. Here, two parking spaces are available, so two cars can park simultaneously; the third car must wait.
+
+#include <chrono>
+#include <iostream>
+#include <semaphore>
+#include <thread>
+
+using namespace std;
+
+// Maximum and initial number of permits are 2.
+counting_semaphore<2> parkingSpaces(2);
+
+void parkCar(string carName) {
+    // Wait for an available parking space.
+    parkingSpaces.acquire();
+
+    cout << carName << " entered the parking area\n";
+    this_thread::sleep_for(chrono::seconds(2));
+    cout << carName << " left the parking area\n";
+
+    // Return the parking permit.
+    parkingSpaces.release();
+}
+
+int main() {
+    thread car1(parkCar, "Car 1");
+    thread car2(parkCar, "Car 2");
+    thread car3(parkCar, "Car 3");
+
+    car1.join();
+    car2.join();
+    car3.join();
+
+    return 0;
+}
+Compile with C++20:
+
+g++ -std=c++20 -pthread semaphore.cpp -o semaphore
+acquire() decreases the available permit count. If the count is zero, the thread waits. release() returns a permit and wakes one waiting thread.
+
+3. Atomic: Thread-Safe Counter
+An atomic variable allows simple operations on one variable without using a mutex. Here, two threads safely increment the same counter.
+
+#include <atomic>
+#include <iostream>
+#include <thread>
+
+using namespace std;
+
+atomic<int> counter{0};
+
+void incrementCounter() {
+    for (int i = 0; i < 100000; i++) {
+        counter++;
+    }
+}
+
+int main() {
+    thread thread1(incrementCounter);
+    thread thread2(incrementCounter);
+
+    thread1.join();
+    thread2.join();
+
+    cout << "Final counter: " << counter << '\n';
+
+    return 0;
+}
+Output:
+
+Final counter: 200000
+Without atomic, both threads could update the counter simultaneously and lose some increments. Atomic is suitable for simple counters and flags; use a mutex when multiple variables or multiple operations must be protected together.
+
+Interview Difference
+Mutex: Allows only one thread into a critical section. Example: one key for one car.
+Semaphore: Allows a limited number of threads to access a resource. Example: two parking spaces.
+Atomic: Makes a simple variable operation indivisible and thread-safe without an explicit lock. Example: incrementing a shared counter.

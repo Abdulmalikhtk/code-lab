@@ -1,0 +1,115 @@
+1. Create Patches from Android 14
+First, check that the commits are in the correct order:
+
+git log --oneline --reverse
+If the three commits are consecutive and the last commit is 69423256...:
+
+mkdir -p /tmp/android14_patches
+
+git format-patch -3 69423256f057cde0e4def4298703b21da611f17a6b4 \
+    -o /tmp/android14_patches
+
+ls -l /tmp/android14_patches
+This produces files similar to:
+
+0001-Add-display-brightness-interface.patch
+0002-Implement-brightness-service.patch
+0003-Add-init-and-SELinux-configuration.patch
+If the commits are not consecutive, create one patch per commit:
+
+git format-patch -1 f79b1e99ef101881ff2018d33fc16365dc3fc3d4dd \
+    -o /tmp/android14_patches
+
+git format-patch -1 c9c56f20c0677069796c325f6bad8a01dde840b24df \
+    -o /tmp/android14_patches
+
+git format-patch -1 69423256f057cde0e4def4298703b21da611f17a6b4 \
+    -o /tmp/android14_patches
+Apply dependent patches in their original chronological order.
+
+2. Prepare the Android 16 Repository
+For a normal Git repository:
+
+git clone <destination-url> android16_project
+cd android16_project
+
+git checkout -b feature/android16-migration origin/android16
+For an AOSP checkout, Android uses repo to manage multiple Git projects:
+
+repo init -u <manifest-url> -b <android16-branch>
+repo sync -c -j8
+
+cd <project-path>
+repo start feature/android16-migration .
+Patches must normally be created and applied separately for each Git project in the AOSP checkout.
+
+3. Apply the Patches
+Use --3way, not --3:
+
+git am --3way /tmp/android14_patches/*.patch
+If all patches apply successfully:
+
+git status
+git log --oneline -3
+4. Resolve Patch Conflicts
+If git am reports a conflict:
+
+git status
+Open the conflicting files, compare the Android 14 implementation with the Android 16 code, and manually resolve the conflict. Then continue:
+
+git add <resolved-file>
+git am --continue
+Other useful commands are:
+
+# Skip the current patch only when it is no longer required
+git am --skip
+
+# Cancel the complete patch operation
+git am --abort
+Do not use git commit while resolving a git am conflict. After resolving and staging the files, use git am --continue.
+
+Example Migration Work
+Suppose the Android 14 feature controls display brightness through a native service.
+
+During migration to Android 16, you may need to update:
+
+AIDL interfaces or generated API versions
+Service registration and Binder APIs
+Android.bp dependencies
+init.rc service definitions
+VINTF manifests and compatibility matrices
+SELinux domains, file contexts, and allow rules
+Framework APIs that changed or became deprecated
+Compiler errors caused by newer Clang or C++ rules
+Kernel or HAL interfaces used for brightness control
+After porting, build and test the feature:
+
+adb logcat
+adb shell dumpsys display
+adb shell dumpsys power
+adb shell settings get system screen_brightness
+adb shell cat /sys/class/backlight/*/brightness
+Also run the relevant unit tests, integration tests, CTS, VTS, and device regression tests.
+
+Interview Answer
+“I worked on migrating a feature from an Android 14 baseline to Android 16. First, I identified the feature commits and their dependencies using Git history. I created ordered patches with git format-patch, prepared an Android 16 branch, and applied the patches using git am --3way.”
+
+“Some patches had conflicts because Android 16 contained API, build-system, and framework changes. I manually adapted the code instead of simply copying the Android 14 implementation. I updated the AIDL or Binder integration, Android.bp, init.rc, VINTF configuration, and SELinux policy where required.”
+
+“After resolving each conflict, I staged the files and used git am --continue. Finally, I built the affected modules and full image, flashed the device, and validated the feature using logcat, dumpsys, kernel logs, and relevant CTS/VTS and regression tests.”
+
+Common Interview Questions
+Why did you use git format-patch?
+It exports commits while preserving the author, commit message, and change history. It is useful when changes must be transferred between different clones or Android baselines.
+
+Why use git am --3way?
+If a patch cannot be applied directly, Git attempts a three-way merge using the original commit information. Manual resolution is still required for real code or API differences.
+
+How did you handle conflicts?
+I checked git status, understood the old and new implementations, manually updated the code for Android 16, staged the resolved files, and ran git am --continue.
+
+How did you verify the migration?
+I built the affected modules, completed a full build when required, flashed the device, checked boot and runtime logs, tested the feature, and ran regression, CTS, and VTS tests.
+
+What was the main challenge?
+The main challenge was not applying the patches but adapting Android 14 assumptions to Android 16 APIs, security rules, HAL contracts, and build requirements.

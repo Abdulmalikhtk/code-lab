@@ -1,0 +1,66 @@
+1. Dereferencing a Pointer
+Dereferencing means accessing the value stored at the address held by a pointer. In C++, * accesses an object and -> accesses an object’s member.
+
+int number = 10;
+int* pointer = &number;
+
+cout << *pointer; // Prints 10
+2. Null Pointer
+A null pointer intentionally points to no valid object.
+
+int* pointer = nullptr;
+
+if (pointer != nullptr) {
+    cout << *pointer;
+} else {
+    cout << "Pointer is null\n";
+}
+Dereferencing a null pointer causes undefined behavior and usually crashes:
+
+int* pointer = nullptr;
+cout << *pointer; // Wrong: null-pointer dereference
+3. Dangling Pointer
+A dangling pointer holds the address of an object that has already been destroyed or deleted.
+
+int* pointer = new int(100);
+
+delete pointer;
+
+// pointer still contains the old invalid address.
+pointer = nullptr;
+Dereferencing the pointer after delete is undefined behavior:
+
+int* pointer = new int(100);
+delete pointer;
+
+cout << *pointer; // Wrong: dangling-pointer dereference
+Simple Safe Program
+#include <iostream>
+using namespace std;
+
+int main() {
+    int* pointer = new int(100);
+
+    if (pointer != nullptr) {
+        cout << "Value: " << *pointer << '\n';
+    }
+
+    delete pointer;
+    pointer = nullptr;
+
+    if (pointer == nullptr) {
+        cout << "Pointer is null and cannot be dereferenced\n";
+    }
+
+    return 0;
+}
+Important Difference
+Null pointer: Explicitly points to nothing, for example int* p = nullptr.
+Dangling pointer: Contains an invalid address of an object that no longer exists.
+Dereferencing: Accessing the pointed object using *p or p->member.
+Dereferencing either a null or dangling pointer results in undefined behavior.
+Modern C++ prefers smart pointers:
+
+auto pointer = std::make_unique<int>(100);
+cout << *pointer;
+The memory is automatically released when the smart pointer goes out of scope.

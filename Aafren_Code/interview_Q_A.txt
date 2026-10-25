@@ -1,0 +1,255 @@
+C++ OOP Interview Cheat Sheet
+1. Inheritance
+Inheritance allows a derived class to reuse the data and behavior of a base class, creating an “is-a” relationship.
+Example: Developer is an Employee, so it inherits accessible members of Employee.
+
+2. Polymorphism
+Polymorphism means “one interface, many forms.” The same function name or base-class interface can behave differently depending on the arguments or actual object type.
+
+3. Function Overloading
+Function overloading means defining multiple functions with the same name but different parameter types or counts.
+The compiler selects the correct function at compile time, so it is compile-time polymorphism.
+
+4. Operator Overloading
+Operator overloading defines how operators such as +, -, or == behave for user-defined objects.
+For example, Employee::operator+ can return the combined salaries of two employees.
+
+5. Function Overriding
+Function overriding happens when a derived class provides its own implementation of a virtual base-class function with the same signature.
+The function called is based on the actual object type at runtime.
+
+6. Abstract Class
+An abstract class contains at least one pure virtual function and cannot be instantiated directly.
+It provides a common interface that concrete derived classes must implement.
+
+7. Virtual Function
+A virtual function enables runtime polymorphism. When called through a base pointer or reference, C++ executes the override belonging to the actual object.
+Compilers commonly implement this using a hidden VTable and VPtr.
+
+8. Pure Virtual Function
+A pure virtual function is declared using = 0, such as virtual void getPromotion() = 0;.
+It defines a contract that derived classes must implement before they can be instantiated.
+
+9. Diamond Problem
+The diamond problem occurs when a class inherits the same base class through two different parent classes, producing duplicate base subobjects and ambiguity.
+Virtual inheritance, such as virtual public Employee, ensures that only one shared Employee subobject exists.
+
+10. Constructor and Destructor Order
+During object creation, constructors run from the base class to the derived class.
+During destruction, the order is reversed: the derived destructor runs first, followed by the base destructor.
+
+11. Virtual Destructor
+A base-class destructor should be virtual when objects may be deleted through a base pointer.
+This ensures that both the derived and base destructors run; otherwise, the behavior is undefined.
+
+12. Friend Function
+A friend function is not a class member, but it can access that class’s private and protected members.
+It is useful when an external operation needs controlled access to internal data.
+
+13. Friend Class
+A friend class can access all private and protected members of another class.
+Friendship should be used carefully because it increases coupling and weakens encapsulation.
+
+14. Smart Pointers
+Smart pointers manage dynamically allocated objects automatically using RAII.
+unique_ptr provides exclusive ownership, shared_ptr provides shared ownership, and weak_ptr observes a shared_ptr object without owning it.
+
+15. Dangling Pointer
+A dangling pointer points to memory that has already been destroyed or released. Dereferencing it causes undefined behavior.
+Prefer smart pointers; when using raw owning pointers, assign nullptr after delete, while remembering that other aliases may still dangle.
+
+16. Stack vs Heap Object Creation
+Employee e(...) creates an automatic object whose destructor runs when its scope ends.
+new Employee(...) creates a dynamic object that must be deleted manually or, preferably, managed using a smart pointer.
+
+17. Upcasting
+Upcasting means storing a derived-class object in a base-class pointer or reference, such as Employee* ptr = new Developer(...).
+It is safe and allows the object to be accessed through the common base interface.
+
+18. RAII
+RAII means tying a resource’s lifetime to an object’s lifetime.
+The constructor acquires the resource, and the destructor releases it automatically, making cleanup reliable even during exceptions.
+
+19. Encapsulation
+Encapsulation keeps data private and provides controlled access through public methods such as getters and setters.
+It protects an object’s internal state from invalid or uncontrolled modification.
+
+20. Key Difference: Overloading vs Overriding
+Overloading uses the same function name with different parameters and is resolved at compile time.
+Overriding replaces a virtual base function in a derived class and is resolved at runtime.
+Suggested actions
+
+
+Below are interview-ready answers, especially useful for an Android Embedded/AOSP interview.
+1. Little Endian and Big Endian
+Little endian stores the least significant byte at the lowest memory address. Big endian stores the most significant byte first.
+For 0x12345678:
+Address:        1000  1001  1002  1003
+Little endian:   78    56    34    12
+Big endian:      12    34    56    78
+Most ARM and x86 Android devices use little endian. Network byte order is big endian.
+
+2. Little-Endian to Big-Endian Conversion
+We can reverse the byte order using shifts and masks:
+uint32_t swapEndian(uint32_t value) {
+    return ((value & 0x000000FFU) << 24) |
+           ((value & 0x0000FF00U) << 8)  |
+           ((value & 0x00FF0000U) >> 8)  |
+           ((value & 0xFF000000U) >> 24);
+}
+For network communication, use standard functions such as htonl(), htons(), ntohl(), and ntohs().
+
+3. Migration or Porting Between Versions
+Migration means moving software from one platform or Android version to another. I first build the old code on the new baseline, fix API and build-system changes, update HAL/AIDL interfaces, resolve SELinux and init.rc issues, and then run functional and regression tests.
+Typical areas affected are kernel interfaces, device tree, HALs, framework APIs, permissions, VINTF manifests, SELinux policies, and deprecated libraries.
+
+4. Binder
+Binder is Android’s primary IPC mechanism, allowing processes to communicate securely. It supports method calls, object references, caller identity, permissions, and automatic death notifications.
+For example, an application communicates with system services such as DisplayManager or AudioService through Binder.
+
+5. AIDL
+AIDL stands for Android Interface Definition Language. It defines an IPC interface, and the build system generates client-side proxy and server-side stub code.
+The client calls the proxy, Binder transports the transaction, and the server-side stub invokes the actual implementation.
+
+6. Difference Between AIDL and Binder
+Binder is the underlying IPC mechanism and kernel driver. AIDL is a language and code-generation tool that makes it easier to define and use Binder interfaces.
+In simple terms: Binder is the transport; AIDL defines the contract and generates the communication code.
+
+7. Types of Binder Calls
+Binder calls can be:
+Synchronous: The caller waits until the server processes the request and returns a response.
+Asynchronous or oneway: The caller sends the request and continues without waiting for a response.
+Local Binder: Client and service are in the same process, so the call can happen directly.
+Remote Binder: Client and service are in different processes, so data passes through the Binder driver.
+
+8. Binder Death Notification
+If a remote Binder service dies, the client can register a death recipient using linkToDeath. Binder then informs the client, allowing it to clean up resources or reconnect.
+This is useful because a normal pointer cannot tell us when an object in another process has disappeared.
+
+9. Ring Buffer
+A ring buffer is a fixed-size buffer in which the end connects back to the beginning. It uses read and write indexes, so no elements need to be shifted.
+It is efficient for streaming data, logs, audio samples, sensor data, and producer-consumer systems.
+
+12. malloc() and calloc() in C++
+In modern C++, I prefer automatic objects, STL containers, and smart pointers instead of manual memory allocation.
+auto employee = std::make_unique<Employee>();
+std::vector<int> values(100, 0);
+new/delete can be used when necessary, but malloc/calloc do not call constructors and should generally not be used for C++ objects.
+
+13. Polymorphism
+Polymorphism means one interface, many implementations. A base-class pointer or reference can call different derived-class implementations at runtime.
+class Shape {
+public:
+    virtual void draw() const = 0;
+    virtual ~Shape() = default;
+};
+
+class Circle : public Shape {
+public:
+    void draw() const override {
+        std::cout << "Drawing circle\n";
+    }
+};
+Calling shape->draw() executes Circle::draw() when the actual object is a Circle.
+
+14. Mutex and Semaphore
+A mutex provides mutual exclusion: only one thread can access a protected resource at a time. Usually, the thread that locks the mutex must unlock it.
+A semaphore maintains a counter and allows a configured number of threads to access a resource. It is also useful for signaling between producer and consumer threads.
+
+15. Synchronization Mechanisms
+Common synchronization mechanisms include:
+Mutex and recursive mutex
+Semaphore
+Condition variable
+Read-write lock
+Spinlock
+Atomic variables
+Futex
+Message queue
+Event or signal
+The correct mechanism depends on whether we need mutual exclusion, event notification, resource counting, or lock-free operations.
+
+16. Which OS Have You Worked On?
+Answer only based on your real experience. A good format is:
+“I have mainly worked on Linux and Android/AOSP. I am familiar with Android framework services, Binder/AIDL, HALs, SELinux, init.rc, system debugging, and Linux process and thread concepts.”
+Mention Windows, QNX, FreeRTOS, or another OS only if you have actually worked with it.
+
+17. SELinux Policy or SEPolicy
+SELinux provides mandatory access control in Android. It controls which process or domain can access a file, device node, property, socket, or Binder service.
+When debugging, I check avc: denied logs, identify the source and target contexts, and add the smallest required allow rule. I avoid blindly using generated rules because that may create a security issue.
+
+18. Tombstone Log
+A tombstone is a detailed Android native crash report, usually generated for signals such as SIGSEGV or SIGABRT. It contains the crashing thread, signal, registers, backtrace, loaded libraries, and memory mappings.
+Tombstones are normally stored under /data/tombstones/. Symbols and tools such as llvm-symbolizer, addr2line, or ndk-stack help map addresses to source lines.
+
+19. Tools Used for Logs
+Common Android debugging tools are:
+adb logcat for application, framework, and native logs
+dmesg for kernel logs
+dumpsys for system-service state
+bugreport for a complete diagnostic package
+tombstones for native crashes
+Perfetto or Systrace for performance analysis
+simpleperf for CPU profiling
+strace for system-call tracing
+GDB or LLDB for native debugging
+
+20. Debugging a Display Brightness Issue
+First, I reproduce the issue and determine whether it happens with manual brightness, adaptive brightness, or both. I compare the requested brightness with the value passed through the framework, HAL, and kernel driver.
+Useful checks include:
+adb logcat
+adb shell dumpsys display
+adb shell dumpsys power
+adb shell settings get system screen_brightness
+adb shell cat /sys/class/backlight/*/brightness
+adb shell cat /sys/class/backlight/*/actual_brightness
+adb shell cat /sys/class/backlight/*/max_brightness
+I trace the path from Settings or automatic-brightness logic to Display/Power services, the Lights HAL, the kernel backlight driver, and finally the display panel. I also check SELinux denials, permissions, sensor input, and recent changes.
+
+21. init.rc
+Android init reads .rc files during boot. These files define services, triggers, actions, permissions, users, groups, capabilities, and property-based startup behavior.
+For example, init.rc can start a native daemon when Android boots or when a system property changes.
+service sample_service /vendor/bin/sample_service
+    class hal
+    user system
+    group system
+    disabled
+
+on property:vendor.sample.enable=1
+    start sample_service
+
+22. Android Architecture and Layers
+Android architecture can be explained in five layers:
+Applications: System and user applications.
+Application Framework: ActivityManager, PackageManager, DisplayManager, and other Java APIs.
+System Services and Android Runtime: Framework services, Binder IPC, ART, and core libraries.
+Native Libraries and HAL: Bionic, media libraries, graphics libraries, SQLite, and hardware interfaces.
+Linux Kernel: Process scheduling, memory, drivers, power management, security, and Binder driver.
+
+23. Important Android Libraries
+Common native Android libraries include:
+Bionic: Android’s C standard library
+SurfaceFlinger: Composes display surfaces
+Skia: 2D graphics library
+OpenGL ES/Vulkan: Graphics rendering
+MediaCodec: Audio/video codec framework
+SQLite: Database library
+libbinder: Native Binder IPC support
+liblog: Android native logging
+OpenSSL/BoringSSL: Cryptographic functionality
+
+24. Feature Implementation Question
+Use the STAR format: Situation, Task, Action, and Result.
+Example:
+“I implemented an Android system feature that communicated with a HAL through AIDL. I defined the interface, added the client and service implementation, configured init.rc and SELinux policy, and debugged it using logcat and dumpsys. I validated normal operation, service restart, invalid input, and failure scenarios.”
+Replace this with a feature you genuinely implemented and include your exact contribution.
+
+25. Version Control
+Version control tracks code changes and allows multiple developers to collaborate. I use commands for branching, committing, reviewing differences, resolving conflicts, rebasing, and merging changes.
+For Git, common commands include git status, git diff, git add, git commit, git rebase, and git log. For AOSP, the repo tool manages multiple Git repositories.
+
+26. Jira
+Jira is used to track bugs, features, tasks, priorities, ownership, and sprint progress. A good ticket should include a clear description, reproduction steps, expected and actual behavior, logs, priority, and acceptance criteria.
+In interviews, explain how you update ticket status, attach debugging evidence, link code reviews, and document the final resolution.
+
+

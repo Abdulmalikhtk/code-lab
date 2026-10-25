@@ -1,0 +1,122 @@
+aidl_binder_calculator_flow
+html
+
+AIDL and Binder Basic Idea
+Suppose one Android process provides a calculator service and another process calls:
+
+add(2, 3)      -> 5
+subtract(2, 3) -> -1
+AIDL defines the interface and generates Proxy/Stub code. Binder transports the request between the two processes.
+
+Calculator Example
+Define the calculator interface:
+
+package com.example.calculator;
+
+interface ICalculator {
+    int add(int first, int second);
+    int subtract(int first, int second);
+
+    oneway void addAsync(
+        int first,
+        int second,
+        ICalculatorCallback callback
+    );
+}
+Define the callback interface:
+
+package com.example.calculator;
+
+oneway interface ICalculatorCallback {
+    void onResult(int result);
+}
+Simplified service implementation:
+
+private final ICalculator.Stub binder = new ICalculator.Stub() {
+    @Override
+    public int add(int first, int second) {
+        return first + second;
+    }
+
+    @Override
+    public int subtract(int first, int second) {
+        return first - second;
+    }
+
+    @Override
+    public void addAsync(
+            int first,
+            int second,
+            ICalculatorCallback callback) {
+        try {
+            callback.onResult(first + second);
+        } catch (RemoteException exception) {
+            // Client process may have died.
+        }
+    }
+};
+Client-side calls:
+
+int sum = calculator.add(2, 3);
+int difference = calculator.subtract(2, 3);
+
+Log.d("Calculator", "Sum: " + sum);             // 5
+Log.d("Calculator", "Difference: " + difference); // -1
+Asynchronous call:
+
+calculator.addAsync(2, 3, new ICalculatorCallback.Stub() {
+    @Override
+    public void onResult(int result) {
+        Log.d("Calculator", "Async result: " + result);
+    }
+});
+Synchronous Binder Flow
+For calculator.add(2, 3):
+
+1. Client calls add(2, 3) on the generated Proxy.
+2. Proxy writes 2 and 3 into a Parcel.
+3. Proxy calls Binder transact() with a transaction code.
+4. Binder driver sends the transaction to the service process.
+5. A service Binder thread receives the transaction.
+6. Generated Stub.onTransact() reads 2 and 3.
+7. Stub calls the service implementation.
+8. Service calculates 2 + 3 and returns 5.
+9. Stub writes 5 into the reply Parcel.
+10. Binder sends the reply to the client.
+11. Proxy reads 5 and returns it to the client.
+The client thread remains blocked until the service returns the result.
+
+Types of Binder Calls
+Synchronous Call
+int add(int first, int second);
+The client waits for the response. It is suitable for quick operations but slow synchronous calls should not be made from the UI thread.
+
+Asynchronous oneway Call
+oneway void sendData(int value);
+The client queues the request and continues without waiting for completion. A oneway method must return void and cannot directly return a result.
+
+Asynchronous Call with Callback
+Client -> oneway addAsync(2, 3, callback)
+Service -> callback.onResult(5)
+The client does not wait. When processing finishes, the service makes a reverse Binder call using the callback object.
+
+Local and Remote Calls
+A local Binder call happens when the client and service are in the same process. asInterface() can return the actual Stub, so no kernel IPC is required.
+
+A remote Binder call happens between different processes. The Proxy, Parcel, Binder driver and Stub are used.
+
+Binder Thread Synchronization
+A service has a Binder thread pool, so multiple clients can call it concurrently. The calculator methods are safe because they only use local parameters.
+
+Shared data must be protected:
+
+private int total;
+
+@Override
+public synchronized int add(int first, int second) {
+    total = first + second;
+    return total;
+}
+In native C++, use std::mutex, std::atomic or another suitable synchronization mechanism. Avoid holding a lock while making another remote Binder call because that can cause deadlocks.
+
+Interview summary: AIDL defines the contract and generates Proxy/Stub code. Binder transfers Parcels between processes. Synchronous calls wait for a reply, oneway calls do not wait, and callbacks are used when an asynchronous operation needs to return a result later.

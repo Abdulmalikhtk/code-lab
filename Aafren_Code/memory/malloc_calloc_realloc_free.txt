@@ -1,0 +1,394 @@
+In C, these functions manage dynamic memory, usually called heap memory:
+
+malloc: allocate memory.
+calloc: allocate memory and initialize every byte to zero.
+realloc: resize an existing allocation.
+free: release allocated memory.
+"aafrenfathimam" has 14 characters, so we need 15 bytes: 14 letters plus '\0', which marks the end of a C string.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void)
+{
+    // 1. malloc: space for "aafren" + '\0'
+    char *p = malloc(7);
+    if (p == NULL)
+        return 1;
+
+    strcpy(p, "aafren");
+    printf("malloc:  %s\n", p);
+
+    // 2. realloc: grow to fit "aafrenfathimam" + '\0'
+    char *temp = realloc(p, 15);
+    if (temp == NULL) {
+        free(p);
+        return 1;
+    }
+
+    p = temp;
+    strcpy(p, "aafrenfathimam");
+    printf("realloc: %s\n", p);
+
+    // 3. calloc: a separate buffer, initially all zero bytes
+    char *q = calloc(15, sizeof(char));
+    if (q == NULL) {
+        free(p);
+        return 1;
+    }
+
+    printf("calloc first byte before copying: %d\n", q[0]);
+    strcpy(q, "aafrenfathimam");
+    printf("calloc:  %s\n", q);
+
+    // 4. free: release both buffers
+    free(p);
+    p = NULL;
+    free(q);
+    q = NULL;
+
+    return 0;
+}
+
+Understand The Memory
+Use the buttons in the diagram above to see each operation.
+
+malloc(7) gives seven uninitialized bytes. Their contents are unknown, so we write "aafren" before printing the buffer.
+realloc(p, 15) grows that buffer to 15 bytes. Existing bytes are preserved; the added bytes are uninitialized. It may move the buffer to a new address.
+calloc(15, sizeof(char)) gives a separate 15-byte buffer with every byte zero. For a character buffer, zero is '\0', not the character '0'.
+free(p) releases the allocation. Do not read or write it afterward. free does not automatically set p to NULL; our next statement does that.
+We use temp with realloc because, if resizing fails, the original allocation is still valid and must still be freed.
+
+Where And Why?
+Use malloc when you will fill the memory yourself, calloc when you want zero-initialized memory, and realloc when a buffer needs to grow or shrink. Use free when finished to avoid a memory leak.
+
+Dynamic allocation is useful when the required size is known only while the program runs, such as reading user input or building a growing list. For this fixed name alone, char name[] = "aafrenfathimam"; is simpler and needs no free.
+
+Dynamic allocation is useful when the required size is known only while the program runs, such as reading user input or building a growing list. For this fixed name alone, char name[] = "aafrenfathimam"; is simpler and needs no free.
+It creates one continuous 60-byte block, not 15 separate allocations. The groups in the diagram are just for understanding.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void)
+{
+    char *p = calloc(15, 4);  // 60 zero-initialized bytes
+    if (p == NULL)
+        return 1;
+
+    strcpy(p, "aafrenfathimam");
+    printf("%s\n", p);
+
+    free(p);
+    return 0;
+}
+
+Because p is a char *, each p[index] accesses one byte. You can access p[0] through p[59].
+
+Your name uses 15 bytes, including '\0', so 45 bytes remain unused and zero.
+
+Important: calloc(15, 4) does not automatically mean “15 integers.” For 15 integers, use int *p = calloc(15, sizeof *p);. That allocates 60 bytes if an int is 4 bytes on your system.
+
+Compared with malloc(60), the usable size is the same; calloc guarantees zero-initialized bytes, while malloc does not.'
+
+
+
+
+Diagramatic Representation:
+C MEMORY ALLOCATION: malloc, calloc, realloc, free
+================================================
+
+These functions manage dynamic memory, usually called heap memory.
+Include <stdlib.h> to use them.
+
+Think of memory as a row of boxes.
+Each box below represents one byte.
+A pointer stores the address of the first byte, not the whole string.
+
+Diagram symbols:
+  [?]  = an uninitialized byte; do not assume its value is zero.
+  [0]  = a byte with numeric value zero.
+  [\0] = a zero byte shown as the C string terminator.
+         It is NOT the character '0'.
+
+Our name: "aafrenfathimam"
+  14 letters + 1 terminating '\0' = 15 bytes.
+
+The diagrams show usable buffer sizes, not allocator overhead.
+
+
+1. MALLOC: ALLOCATE MEMORY
+=========================
+
+Code:
+  char *p = malloc(7);
+  if (p == NULL)
+      return 1;
+
+malloc(7) requests one continuous block of 7 bytes.
+It does NOT initialize the bytes.
+
+Immediately after successful allocation:
+
+  p ---> [?][?][?][?][?][?][?]
+          0  1  2  3  4  5  6     byte indices
+
+Now write a short string:
+  strcpy(p, "aafren");
+
+  p ---> [a][a][f][r][e][n][\0]
+          0  1  2  3  4  5   6
+
+Six letters plus the terminator fit in 7 bytes.
+Do not print the buffer as a string before writing a valid string into it.
+
+Use malloc when you will fill the memory yourself.
+
+
+2. REALLOC: RESIZE EXISTING MEMORY
+=================================
+
+Our current 7-byte allocation:
+
+  p ---> [a][a][f][r][e][n][\0]
+
+The full name needs 15 bytes. Grow the allocation:
+
+  char *temp = realloc(p, 15);
+  if (temp == NULL) {
+      free(p);
+      return 1;
+  }
+  p = temp;
+
+After successful resizing, before writing the full name:
+
+  p ---> [a][a][f][r][e][n][\0][?][?][?][?][?][?][?][?]
+          |----- preserved -----| |--- 8 added bytes ---|
+
+Existing bytes are preserved. Added bytes are uninitialized.
+The block may stay at the same address OR move to a new address.
+After success, use the returned pointer, not an old saved address.
+If it moves, realloc handles releasing the old block for you.
+
+Now write the full name:
+  strcpy(p, "aafrenfathimam");
+
+  p ---> [a][a][f][r][e][n][f][a][t][h][i][m][a][m][\0]
+          0  1  2  3  4  5  6  7  8  9 10 11 12 13  14
+
+Why use temp?
+If realloc fails, it returns NULL but the original allocation remains
+valid. A temporary pointer keeps us from losing the original address.
+This example frees the original allocation and exits on failure.
+
+Use realloc when an existing buffer needs to grow or shrink.
+
+
+3. CALLOC: ALLOCATE AND ZERO-INITIALIZE
+======================================
+
+General form:
+  calloc(number_of_elements, bytes_per_element)
+
+Example:
+  char *q = calloc(15, sizeof(char));
+  if (q == NULL)
+      return 1;
+
+sizeof(char) is always 1 in C.
+Total allocation: 15 * 1 = 15 bytes, all initialized to zero.
+
+Immediately after successful allocation:
+
+  q ---> [0][0][0][0][0][0][0][0][0][0][0][0][0][0][0]
+          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14
+
+For a char buffer, each zero byte is '\0'.
+The first byte is already '\0', so the buffer initially holds an empty
+string, not a string of printed zero digits.
+
+Now write the name:
+  strcpy(q, "aafrenfathimam");
+
+  q ---> [a][a][f][r][e][n][f][a][t][h][i][m][a][m][\0]
+
+Use calloc when you want the allocated bytes to start at zero.
+
+
+4. CALLOC(15, 4): WHAT DOES IT MEAN?
+==================================
+
+Code:
+  char *q = calloc(15, 4);
+  if (q == NULL)
+      return 1;
+
+  First argument:  15 elements
+  Second argument:  4 bytes per element
+  Total:           15 * 4 = 60 bytes
+
+It allocates ONE continuous block, NOT 15 separate allocations.
+All 60 bytes start at zero.
+
+Below, each group contains 4 bytes. The block is wrapped across lines
+only to make it fit in a text document. There are no gaps in the buffer.
+
+  q ---> [0][0][0][0] [0][0][0][0] [0][0][0][0]
+         bytes 0-3   bytes 4-7   bytes 8-11
+
+         [0][0][0][0] [0][0][0][0] [0][0][0][0]
+         bytes 12-15 bytes 16-19 bytes 20-23
+
+         [0][0][0][0] [0][0][0][0] [0][0][0][0]
+         bytes 24-27 bytes 28-31 bytes 32-35
+
+         [0][0][0][0] [0][0][0][0] [0][0][0][0]
+         bytes 36-39 bytes 40-43 bytes 44-47
+
+         [0][0][0][0] [0][0][0][0] [0][0][0][0]
+         bytes 48-51 bytes 52-55 bytes 56-59
+
+Because q is a char pointer, q[index] accesses ONE byte.
+Valid indices are q[0] through q[59]. q[60] is out of bounds.
+The arguments do not force char indexing into groups of 4 bytes.
+
+After strcpy(q, "aafrenfathimam"):
+
+  q ---> [a][a][f][r][e][n][f][a][t][h][i][m][a][m][\0]
+         |------------- first 15 bytes --------------|
+
+         followed by 45 unused bytes, still zero.
+
+For 15 integers, write:
+  int *numbers = calloc(15, sizeof *numbers);
+
+That allocation is 60 bytes IF sizeof(int) is 4 on your system.
+Prefer sizeof over hard-coding 4 for an integer array.
+The valid integer indices are numbers[0] through numbers[14].
+Remember to free(numbers) when finished.
+
+
+5. FREE: RELEASE ALLOCATED MEMORY
+================================
+
+Before:
+
+  p ---> [a][a][f][r][e][n][f][a][t][h][i][m][a][m][\0]
+
+Code:
+  free(p);
+
+After:
+
+  old allocation ---> [released: do not read or write]
+
+free releases the allocation for reuse by the memory allocator.
+It does not guarantee that the old contents are erased.
+It does not automatically set your pointer to NULL.
+
+Then write:
+  p = NULL;
+
+  p ---> NULL
+
+Setting p to NULL does not fix any other pointers to the released block.
+Do not access released memory or free the same allocation twice.
+free(NULL) is safe and does nothing.
+
+
+6. MALLOC VS CALLOC
+==================
+
+  malloc(60)
+    Total usable size: 60 bytes
+    Initial contents: uninitialized
+
+  calloc(15, 4)
+    Total usable size: 60 bytes
+    Initial contents: every byte is zero
+
+Neither function copies a name into memory for you.
+Both can fail and return NULL. Check before using the pointer.
+Both allocations must be freed when no longer needed.
+
+
+7. ONE COMPLETE, SIMPLE C PROGRAM
+================================
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void)
+{
+    // malloc: 6 letters plus the string terminator.
+    char *p = malloc(7);
+    if (p == NULL)
+        return 1;
+
+    strcpy(p, "aafren");
+    printf("malloc:  %s\n", p);
+
+    // realloc: grow to fit 14 letters plus the terminator.
+    char *temp = realloc(p, 15);
+    if (temp == NULL) {
+        free(p);
+        return 1;
+    }
+    p = temp;
+
+    strcpy(p, "aafrenfathimam");
+    printf("realloc: %s\n", p);
+
+    // calloc: a separate 60-byte, zero-initialized block.
+    char *q = calloc(15, 4);
+    if (q == NULL) {
+        free(p);
+        return 1;
+    }
+
+    printf("calloc first byte before copying: %d\n", q[0]);
+    strcpy(q, "aafrenfathimam");
+    printf("calloc:  %s\n", q);
+
+    free(p);
+    p = NULL;
+    free(q);
+    q = NULL;
+
+    return 0;
+}
+
+Expected output:
+
+  malloc:  aafren
+  realloc: aafrenfathimam
+  calloc first byte before copying: 0
+  calloc:  aafrenfathimam
+
+strcpy also copies the terminating '\0'.
+Here the destination buffers are large enough for the known strings.
+For unknown input, check its length and the destination capacity.
+
+
+8. WHEN DO WE NEED DYNAMIC ALLOCATION?
+======================================
+
+Use it when:
+  - The required size becomes known while the program runs.
+  - A buffer must grow, such as while reading input.
+  - Allocated data must remain available after a function returns.
+    Returning a heap pointer is possible; returning a pointer to a
+    function's local array is not safe after that function returns.
+
+For just a fixed name, this is simpler:
+  char name[] = "aafrenfathimam";
+
+A local array like that does not need free.
+Never pass that local array to free or realloc.
+
+Memory rule to remember:
+  Allocate -> check success -> use within bounds -> free when finished.
